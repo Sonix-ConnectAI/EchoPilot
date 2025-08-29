@@ -1,0 +1,66 @@
+/* Color Variables for Black and White Theme */
+:root {
+  /* Background Colors */
+  --bg-primary: #000000;          /* Pure black for main application background */
+  --bg-secondary: #000000;        /* Pure black for cards and containers */
+  --bg-tertiary: #000000;         /* Pure black for nested elements */
+  
+  /* Text Colors */
+  --text-primary: #FFFFFF;        /* Pure white for main text and headings */
+  --text-secondary: #FFFFFF;      /* Pure white for secondary text and descriptions */
+  
+  /* Accent Colors */
+  --accent-orange: #FFFFFF;       /* White for primary actions and highlights */
+  --accent-green: #FFFFFF;        /* White for success states and positive indicators */
+  
+  /* Interactive Colors */
+  --orange-hover: #CCCCCC;        /* Light gray for hover states */
+  --green-hover: #CCCCCC;         /* Light gray for hover states */
+  
+  /* Utility Colors */
+  --border-color: #FFFFFF;        /* White for borders and dividers */
+  --error-red: #FFFFFF;           /* White for error states */
+  --warning-orange: #FFFFFF;      /* White for warnings */
+  --info-blue: #FFFFFF;           /* White for informational elements */
+  
+  /* Legacy Support (for backward compatibility) */
+  --primary-black: var(--bg-primary);
+  --primary-white: var(--text-primary);
+  --secondary-white: var(--bg-secondary);
+  --orange-primary: var(--accent-orange);
+  --orange-secondary: var(--orange-hover);
+  --lime-green-primary: var(--accent-green);
+  --lime-green-secondary: var(--green-hover);
+  --dark-gray: var(--bg-tertiary);
+  --medium-gray: #999999;
+  --light-gray: var(--text-secondary);
+  
+  /* Button Colors */
+  --btn-primary-bg: var(--accent-orange);
+  --btn-primary-hover: var(--orange-hover);
+  --btn-primary-text: #000000;
+  --btn-secondary-bg: var(--border-color);
+  --btn-secondary-hover: #CCCCCC;
+  --btn-secondary-text: #000000;
+  --btn-success-bg: var(--accent-green);
+  --btn-success-hover: var(--green-hover);
+  --btn-success-text: #000000;
+  
+  /* Status Colors */
+  --status-success: var(--accent-green);
+  --status-error: var(--error-red);
+  --status-warning: var(--accent-orange);
+  --status-info: var(--text-primary);
+  
+  /* Shadow Colors (adjusted for dark theme) */
+  --shadow-light: rgba(255, 255, 255, 0.1);
+  --shadow-medium: rgba(255, 255, 255, 0.2);
+  --shadow-dark: rgba(255, 255, 255, 0.3);
+  --shadow-orange: rgba(255, 255, 255, 0.5);
+  --shadow-green: rgba(255, 255, 255, 0.5);
+  
+  /* Focus and Selection */
+  --focus-color: var(--accent-orange);
+  --selection-bg: var(--accent-orange);
+  --selection-text: #000000;
+}
