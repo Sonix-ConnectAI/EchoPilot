@@ -8,6 +8,10 @@ import sys
 import os
 from pathlib import Path
 
+BASE_DIR = Path(__file__).parent.resolve()
+PROJECT_ROOT = BASE_DIR.parent.resolve()
+
+
 def check_dependencies():
     """Check if required Python packages are installed"""
     try:
@@ -27,18 +31,18 @@ def check_dependencies():
 
 def create_test_data():
     """Create test NPZ file if it doesn't exist"""
-    test_npz_path = "../26409027/2020-07-14/26409027(5).dcm.npz"
+    test_npz_path = PROJECT_ROOT / "26409027/2020-07-14/26409027(5).dcm.npz"
     
     if not os.path.exists(test_npz_path):
         print("📁 Creating test NPZ file...")
         try:
-            subprocess.run([sys.executable, "create_test_npz.py"], check=True)
+            subprocess.run([sys.executable, "create_test_npz.py"], check=True, cwd=str(BASE_DIR))
             print("✅ Test NPZ file created successfully")
         except subprocess.CalledProcessError:
             print("❌ Failed to create test NPZ file")
             return False
     else:
-        print(f"✅ Test NPZ file exists: {os.path.abspath(test_npz_path)}")
+        print(f"✅ Test NPZ file exists: {os.path.abspath(str(test_npz_path))}")
     
     return True
 
@@ -46,6 +50,19 @@ def main():
     """Main startup function"""
     print("🚀 Starting NPZ to MP4 Conversion Server")
     print("=" * 50)
+    # Load environment variables from backend and project root .env files, if available
+    try:
+        from dotenv import load_dotenv
+        backend_env = BASE_DIR / ".env"
+        root_env = PROJECT_ROOT / ".env"
+        if root_env.exists():
+            load_dotenv(dotenv_path=str(root_env), override=False)
+        if backend_env.exists():
+            load_dotenv(dotenv_path=str(backend_env), override=True)
+        print("🔧 Loaded environment from .env files (root and backend, if present)")
+    except Exception as e:
+        # Continue even if python-dotenv is not installed
+        print(f"⚠️  Could not load .env files automatically ({e}). Proceeding with OS environment.")
     
     # Check dependencies
     if not check_dependencies():
@@ -62,7 +79,7 @@ def main():
     print("   API Endpoint: http://localhost:5000/api/convert-npz?path=<NPZ_FILE_PATH>")
     
     print("\n🧪 Test URL:")
-    test_path = os.path.abspath("../26409027/2020-07-14/26409027(5).dcm.npz")
+    test_path = os.path.abspath(str(PROJECT_ROOT / "26409027/2020-07-14/26409027(5).dcm.npz"))
     print(f"   http://localhost:5000/api/convert-npz?path={test_path}")
     
     print("\n🔧 Environment:")
@@ -75,11 +92,11 @@ def main():
     # Start the Flask app
     try:
         from app import app
-        app.run(
-            host='0.0.0.0',
-            port=5000,
-            debug=True
-        )
+        host = os.environ.get("FLASK_RUN_HOST", "0.0.0.0")
+        port = int(os.environ.get("FLASK_RUN_PORT", "5000"))
+        debug = os.environ.get("FLASK_DEBUG", "true").lower() == "true"
+        print(f"🌐 Binding Flask on {host}:{port} (debug={debug})")
+        app.run(host=host, port=port, debug=debug)
     except KeyboardInterrupt:
         print("\n👋 Server stopped by user")
     except Exception as e:

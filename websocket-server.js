@@ -1,8 +1,8 @@
 // 환경 변수 로드
 require('dotenv').config();
 
-const WebSocket = require('ws');
-const http = require('http');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 
 // OpenAI 설정 - API 키가 없어도 서버는 시작되도록 수정
 let openai = null;
@@ -24,56 +24,79 @@ try {
   }
 } catch (error) {
   console.warn('OpenAI client initialization failed:', error.message);
-  console.warn('WebSocket server will start but OpenAI features will be disabled');
+  console.warn('Socket.IO server will start but OpenAI features will be disabled');
 }
 
-// WebSocket 서버 생성
-const server = http.createServer();
-const wss = new WebSocket.Server({ server });
+// HTTP 서버 생성
+const httpServer = createServer();
+
+// Socket.IO 서버 생성 (CORS 허용)
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // 모든 origin 허용
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 // 연결된 클라이언트 관리
 const clients = new Map();
 let clientIdCounter = 0;
 
-// WebSocket 연결 처리
-wss.on('connection', (ws, req) => {
+// Socket.IO 연결 처리
+io.on('connection', (socket) => {
   const clientId = ++clientIdCounter;
   clients.set(clientId, {
-    ws,
+    socket,
     id: clientId,
     connectedAt: new Date(),
     lastActivity: new Date()
   });
 
-  console.log(`Client ${clientId} connected from ${req.socket.remoteAddress}`);
+  console.log(`Client ${clientId} connected from ${socket.handshake.address}`);
 
   // 클라이언트에 연결 확인 메시지 전송
-  ws.send(JSON.stringify({
-    type: 'connection_established',
+  socket.emit('connection_established', {
     clientId,
     timestamp: new Date().toISOString()
-  }));
+  });
 
   // 메시지 수신 처리
-  ws.on('message', async (message) => {
+  socket.on('message', async (data) => {
     try {
-      const data = JSON.parse(message);
       await handleMessage(clientId, data);
     } catch (error) {
       console.error('Error processing message:', error);
-      sendError(ws, 'Invalid message format');
+      socket.emit('error', { error: 'Invalid message format' });
     }
   });
 
+  // OpenAI 요청 처리
+  socket.on('openai_request', async (data) => {
+    try {
+      await handleOpenAIRequest(clientId, data);
+    } catch (error) {
+      console.error('Error handling OpenAI request:', error);
+      socket.emit('error', { error: error.message });
+    }
+  });
+
+  // ping/pong 처리
+  socket.on('ping', () => {
+    socket.emit('pong', {
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // 연결 종료 처리
-  ws.on('close', (code, reason) => {
-    console.log(`Client ${clientId} disconnected: ${code} - ${reason}`);
+  socket.on('disconnect', (reason) => {
+    console.log(`Client ${clientId} disconnected: ${reason}`);
     clients.delete(clientId);
   });
 
   // 에러 처리
-  ws.on('error', (error) => {
-    console.error(`WebSocket error for client ${clientId}:`, error);
+  socket.on('error', (error) => {
+    console.error(`Socket error for client ${clientId}:`, error);
     clients.delete(clientId);
   });
 });
@@ -92,26 +115,31 @@ async function handleMessage(clientId, data) {
         break;
       
       case 'ping':
-        sendMessage(client.ws, {
+        client.socket.emit('pong', {
           messageId,
-          type: 'pong',
           timestamp: new Date().toISOString()
         });
         break;
       
       default:
-        sendError(client.ws, `Unknown message type: ${type}`, messageId);
+        client.socket.emit('error', { 
+          messageId, 
+          error: `Unknown message type: ${type}` 
+        });
     }
   } catch (error) {
     console.error('Error handling message:', error);
-    sendError(client.ws, error.message, messageId);
+    client.socket.emit('error', { messageId, error: error.message });
   }
 }
 
 // OpenAI 요청 처리
 async function handleOpenAIRequest(client, messageId, requestData) {
   if (!openai) {
-    sendError(client.ws, 'OpenAI API is not configured. Please set OPENAI_API_KEY environment variable.', messageId);
+    client.socket.emit('error', { 
+      messageId, 
+      error: 'OpenAI API is not configured. Please set OPENAI_API_KEY environment variable.' 
+    });
     return;
   }
 
@@ -138,22 +166,27 @@ async function handleOpenAIRequest(client, messageId, requestData) {
 
       const content = completion.choices[0]?.message?.content || '';
       
-      sendMessage(client.ws, {
+      client.socket.emit('response', {
         messageId,
-        type: 'response',
         content: content.trim()
       });
     }
   } catch (error) {
     console.error('OpenAI API error:', error);
-    sendError(client.ws, `OpenAI API error: ${error.message}`, messageId);
+    client.socket.emit('error', { 
+      messageId, 
+      error: `OpenAI API error: ${error.message}` 
+    });
   }
 }
 
-      // 스트리밍 응답 처리
+// 스트리밍 응답 처리
 async function handleStreamingResponse(client, messageId, options) {
   if (!openai) {
-    sendError(client.ws, 'OpenAI API is not configured', messageId);
+    client.socket.emit('error', { 
+      messageId, 
+      error: 'OpenAI API is not configured' 
+    });
     return;
   }
 
@@ -168,51 +201,39 @@ async function handleStreamingResponse(client, messageId, options) {
         fullContent += content;
         
         // 스트리밍 청크 전송
-        sendMessage(client.ws, {
+        client.socket.emit('stream_chunk', {
           messageId,
-          type: 'stream_chunk',
           content
         });
       }
     }
     
     // 스트리밍 완료 메시지 전송
-    sendMessage(client.ws, {
+    client.socket.emit('stream_end', {
       messageId,
-      type: 'stream_end',
       content: fullContent.trim()
     });
     
   } catch (error) {
     console.error('Streaming error:', error);
-    sendError(client.ws, `Streaming error: ${error.message}`, messageId);
+    client.socket.emit('error', { 
+      messageId, 
+      error: `Streaming error: ${error.message}` 
+    });
   }
-}
-
-// 메시지 전송 헬퍼 함수
-function sendMessage(ws, data) {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-}
-
-// 에러 메시지 전송
-function sendError(ws, error, messageId = null) {
-  sendMessage(ws, {
-    messageId,
-    type: 'error',
-    error: error
-  });
 }
 
 // 서버 시작
 const PORT = process.env.WS_PORT || 3002;
-server.listen(PORT, () => {
-  console.log(`WebSocket server running on port ${PORT}`);
+const HOST = process.env.WS_HOST || '0.0.0.0';
+
+httpServer.listen(PORT, HOST, () => {
+  console.log(`Socket.IO server running on ${HOST}:${PORT}`);
   console.log(`OpenAI API configured: ${openai ? 'Yes' : 'No'}`);
   if (!openai) {
     console.log('To enable OpenAI features, set OPENAI_API_KEY environment variable');
   }
+  console.log(`External users can connect using http://<YOUR_IP>:${PORT}`);
 });
 
 // 정기적인 연결 상태 체크
@@ -224,7 +245,7 @@ setInterval(() => {
     // 5분 이상 활동이 없으면 연결 종료
     if (timeSinceLastActivity > 5 * 60 * 1000) {
       console.log(`Closing inactive client ${clientId}`);
-      client.ws.close(1000, 'Inactive timeout');
+      client.socket.disconnect(true);
       clients.delete(clientId);
     }
   }
@@ -234,14 +255,14 @@ setInterval(() => {
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  console.log('Shutting down WebSocket server...');
+  console.log('Shutting down Socket.IO server...');
   
   for (const [clientId, client] of clients) {
-    client.ws.close(1000, 'Server shutdown');
+    client.socket.disconnect(true);
   }
   
-  server.close(() => {
-    console.log('WebSocket server closed');
+  httpServer.close(() => {
+    console.log('Socket.IO server closed');
     process.exit(0);
   });
 });

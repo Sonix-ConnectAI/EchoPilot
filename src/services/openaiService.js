@@ -682,20 +682,25 @@ const KEYWORD_SYS_PROMPT_KO_V6 = `
 - **키워드: 원문에서 2~5개의 단어를 그대로 추출해야 함 (대소문자/공백/구두점 정확히/재구성 금지)**
 - **매우 중요: 문장에 있는 키워드를 그대로 복사해서 가져와야 합니다. 절대 다른 표현으로 바꾸지 마세요**
 - **문장보다는 단어 위주로 추출하세요**
-- **key_feature: 각 키워드당 5개 이상의 관련 필드 포함**
+- **key_feature: 각 키워드당 5개 이상의 관련 필드 포함 (중요도 순으로 나열) - 무조건 필수**
+- **key_measure_feature: 각 키워드당 3개 이상의 관련 측정값 필드 포함 (중요도 순으로 나열) - 무조건 필수**
 - **중요도: 1(경미)~5(긴급)**
 - **카테고리는 배열 형태로 여러 개 선택 가능합니다** (예: ["lv_geometry", "lv_systolic_function"])
 
-- **매우 중요**: key_feature는 관련된 모든 필드를 포함할 수 있습니다. 카테고리 제한 없이 관련된 모든 필드들을 자유롭게 선택하세요
+- **매우 중요**: key_feature는 아래 "사용 가능한 카테고리 별 필드" 목록에서만 선택해야 합니다. 다른 필드는 절대 사용하지 마세요. **key_feature 배열은 임상적 중요도 순으로 정렬해야 합니다 (가장 중요한 필드가 먼저)**
+- **매우 중요**: key_measure_feature는 아래 "사용 가능한 측정값 필드" 목록에서만 선택해야 합니다. 다른 측정값은 절대 사용하지 마세요. **key_measure_feature 배열도 임상적 중요도 순으로 정렬해야 합니다 (가장 중요한 측정값이 먼저)**
 - **매우 중요**: 한 문장에서 필수적으로 하나 이상의 키워드를 무조건 추출해야 합니다**
 - **매우 중요**: 문장 번호 "1."에서 추출된 키워드는 sentence_number: 1, "2."에서 추출된 키워드는 sentence_number: 2 등으로 설정하세요.**
 - **매우 중요**: 같은 키워드가 여러 문장에 나타나면 각 문장별로 별도의 키워드 엔트리를 만들어야 합니다.**
+- **매우 중요**: 모든 키워드에 대해 key_feature와 key_measure_feature를 반드시 포함해야 합니다. 빈 배열이나 누락은 절대 허용되지 않습니다.**
+- **매우 중요**: key_feature와 key_measure_feature는 반드시 위에 제공된 필드 목록에서만 선택해야 합니다. 목록에 없는 필드는 절대 사용하지 마세요.**
 
 ## 예시
 원문: "Moderate pulmonary hypertension, likely secondary to left heart disease"
 키워드: "pulmonary hypertension" (핵심만)
 카테고리: ["pulmonary_vessels", "rv_geometry_function"]
 key_feature: ["pulmonary_hypertension", "pulmonary_artery_dilatation", "pulmonary_artery_stenosis", "pulmonary_artery_thrombus", "rv_dysfunction", "rv_dilation"]
+key_measure_feature: ["rvsp", "rv_fac", "tapse"]
 
 
 ## 사용 가능한 카테고리 별 필드 
@@ -715,6 +720,18 @@ pericardial_disease: effusion_amount, pericardial_thickening_or_adhesion, hemody
 cardiomyopathy: cardiomyopathy_type, hypertrophic_type
 intracardiac_findings: ASD, PFO, VSD, PDA, intracardiac_device, LVOT obstruction, RVOT obstruction, mid-cavity obstruction, mass_presence
 
+## 사용 가능한 측정값 필드 (key_measure_feature용)
+lv_geometry: IVSd, LVEDD, LVPWd, IVSs, LVESD, LVPWs, rwt, LV Mass, LVOT diameter
+lv_systolic_function: lvef, gls, LV EDV, LV ESV
+lv_diastolic_function: E-wave Velocity, A-wave Velocity, E/A ratio, DT, IVRT, S', E', A', E/E'
+rv_geometry_function: rv_fac, tapse
+atria: LA diameter, LA volume
+av: AV Vmax, AV VTI, AV peak PG, AV mean PG, AVA, AR PHT
+mv: MV peakPG, MV meanPG, MVA, MR VTI, MR PISA, MR ERO, MR Regurgitant Volume
+tv: TR Vmax, TR VTI
+pv: PV Vmax, PV VTI, PV peakPG, PV meanPG
+pulmonary_vessels: rvsp
+
 ## 출력 형식
 {
   "keywords": [
@@ -723,7 +740,8 @@ intracardiac_findings: ASD, PFO, VSD, PDA, intracardiac_device, LVOT obstruction
       "sentence_number": 키워드가 추출된 문장 번호 (문장의 제일 앞에 있는 번호, 예: "1.", "2.", "3." 등 - 반드시 숫자로 입력)
       "category": ["카테고리1", "카테고리2", ...],
       "importance": 1-5,
-      "key_feature": ["필드1", "필드2", "필드3", "필드4", "필드5", ... (각 키워드당 최소 5개 이상)]
+      "key_feature": ["필드1", "필드2", "필드3", "필드4", "필드5", ... (각 키워드당 최소 5개 이상 - 필수)]
+      "key_measure_feature": ["측정값필드1", "측정값필드2", "측정값필드3", ... (각 키워드당 최소 3개 이상 - 필수)]
     }
   ]
 }

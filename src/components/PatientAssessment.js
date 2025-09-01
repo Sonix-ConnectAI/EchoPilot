@@ -173,6 +173,86 @@ const standardizedStructure = {
   }
 };
 
+// Measurement fields extracted from standardizedStructure.js (float type fields only)
+const standardizedStructure_measure = {
+  // --------------------------- LV Geometry ---------------------------
+  "lv_geometry": {
+    "IVSd": "float",
+    "LVEDD": "float",
+    "LVPWd": "float",
+    "IVSs": "float",
+    "LVESD": "float",
+    "LVPWs": "float",
+    "rwt": "float",
+    "LV Mass": "float",
+    "LVOT diameter": "float"
+  },
+  // ---------------------- LV Systolic Function -----------------------
+  "lv_systolic_function": {
+    "lvef": "float",
+    "gls": "float",
+    "LV EDV": "float",
+    "LV ESV": "float"
+  },
+  // ---------------------- LV Diastolic Function ----------------------
+  "lv_diastolic_function": {
+    "E-wave Velocity": "float",
+    "A-wave Velocity": "float",
+    "E/A ratio": "float",
+    "DT": "float",
+    "IVRT": "float",
+    "S'": "float",
+    "E'": "float",
+    "A'": "float",
+    "E/E'": "float"
+  },
+  // -------------------- RV Geometry & Function -----------------------
+  "rv_geometry_function": {
+    "rv_fac": "float",
+    "tapse": "float"
+  },
+  // ----------------------------- Atria -------------------------------
+  "atria": {
+    "LA diameter": "float",
+    "LA volume": "float"
+  },
+  // ------------------------ Aortic Valve (AV) ------------------------
+  "av": {
+    "AV Vmax": "float",
+    "AV VTI": "float",
+    "AV peak PG": "float",
+    "AV mean PG": "float",
+    "AVA": "float",
+    "AR PHT": "float"
+  },
+  // ------------------------ Mitral Valve (MV) ------------------------
+  "mv": {
+    "MV peakPG": "float",
+    "MV meanPG": "float",
+    "MVA": "float",
+    "MR VTI": "float",
+    "MR PISA": "float",
+    "MR ERO": "float",
+    "MR Regurgitant Volume": "float"
+  },
+  // ---------------------- Tricuspid Valve (TV) -----------------------
+  "tv": {
+    "TR Vmax": "float",
+    "TR VTI": "float"
+  },
+  // --------------------- Pulmonary Valve (PV) ------------------------
+  "pv": {
+    "PV Vmax": "float",
+    "PV VTI": "float",
+    "PV peakPG": "float",
+    "PV meanPG": "float"
+  },
+  // ----------------------- Pulmonary Vessels -------------------------
+  "pulmonary_vessels": {
+    "rvsp": "float"
+  }
+};
+
 // Build structured data from flat patientData using standardizedStructure
 function buildStructuredFromPatientData(source) {
   if (!source) return null;
@@ -414,6 +494,15 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
           mappedFeatures.includes(feature.feature) || keywordObj.key_feature.includes(feature.feature)
         );
 
+        // Sort by key_feature order (maintain the order from AI response)
+        recommendedFeatures.sort((a, b) => {
+          const aIndex = keywordObj.key_feature.indexOf(a.feature);
+          const bIndex = keywordObj.key_feature.indexOf(b.feature);
+          if (aIndex === -1 && bIndex === -1) return 0;
+          if (aIndex === -1) return 1;
+          if (bIndex === -1) return -1;
+          return aIndex - bIndex;
+        });
       }
     } else {
       // If no keyword is selected, show all features from all keywords
@@ -516,7 +605,11 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
             >
               <div className="feature-row">
                 <span className="feature-name">
-                  {item.feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {item.feature
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase())
+                    .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase())
+                  }
                 </span>
                 {fieldOptions ? (
                   <div className="feature-field">
@@ -551,18 +644,127 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
 
   // Removed renderRelevantVideos - videos now shown in main edit panel
 
-  // Extract measurement fields
+  // Extract measurement fields with recommended measurements
   const getMeasurementFields = () => {
     const measurements = [];
-    Object.entries(editedStructuredData).forEach(([category, data]) => {
-      if (typeof data === 'object' && data !== null) {
-        Object.entries(data).forEach(([field, value]) => {
-          if (typeof value === 'number' || (typeof value === 'string' && !isNaN(parseFloat(value)))) {
-            measurements.push({ category, field, value });
+    
+    // Only add recommended measurements from keywords (not existing measurements)
+    if (summaryKeywords && summaryKeywords.length > 0) {
+      const recommendedMeasurements = new Map();
+      
+      // Filter measurements based on selected keyword (like key_feature)
+      if (selectedKeyword) {
+        // Parse uniqueId format: sentence_number::normalized_keyword
+        const [sentenceNumStr, normalizedKeyword] = selectedKeyword.split('::');
+        const sentenceNumber = parseInt(sentenceNumStr);
+        
+        // Resolve keyword using sentence + normalized text
+        const keywordObj = resolveKeyword(sentenceNumber, normalizedKeyword);
+        
+        if (keywordObj && keywordObj.key_measure_feature && Array.isArray(keywordObj.key_measure_feature) && keywordObj.key_measure_feature.length > 0) {
+          // Show only the measurements that are in the selected keyword's key_measure_feature
+          keywordObj.key_measure_feature.forEach((measureField, index) => {
+            // Find the category for this measurement field
+            let foundCategory = null;
+            Object.entries(standardizedStructure_measure).forEach(([cat, fields]) => {
+              if (fields[measureField]) {
+                foundCategory = cat;
+              }
+            });
+            
+            if (foundCategory) {
+              const currentValue = editedStructuredData[foundCategory]?.[measureField];
+              recommendedMeasurements.set(measureField, {
+                category: foundCategory,
+                field: measureField,
+                value: currentValue || null,
+                importance: keywordObj.importanceScore || 3,
+                order: index // Maintain order from key_measure_feature
+              });
+            }
+          });
+          
+          // Sort by key_measure_feature order (maintain the order from AI response)
+          const recommendedArray = Array.from(recommendedMeasurements.values())
+            .sort((a, b) => {
+              const aIndex = keywordObj.key_measure_feature.indexOf(a.field);
+              const bIndex = keywordObj.key_measure_feature.indexOf(b.field);
+              if (aIndex === -1 && bIndex === -1) return 0;
+              if (aIndex === -1) return 1;
+              if (bIndex === -1) return -1;
+              return aIndex - bIndex;
+            });
+          
+          measurements.push(...recommendedArray);
+        }
+      } else {
+        // If no keyword is selected, show all measurements from all keywords
+        summaryKeywords.forEach((kw) => {
+          if (kw.key_measure_feature && Array.isArray(kw.key_measure_feature)) {
+            kw.key_measure_feature.forEach((measureField, index) => {
+              if (!recommendedMeasurements.has(measureField)) {
+                // Find the category for this measurement field
+                let foundCategory = null;
+                Object.entries(standardizedStructure_measure).forEach(([cat, fields]) => {
+                  if (fields[measureField]) {
+                    foundCategory = cat;
+                  }
+                });
+                
+                if (foundCategory) {
+                  const currentValue = editedStructuredData[foundCategory]?.[measureField];
+                  recommendedMeasurements.set(measureField, {
+                    category: foundCategory,
+                    field: measureField,
+                    value: currentValue || null,
+                    importance: kw.importanceScore || 3,
+                    order: index // Maintain order from key_measure_feature
+                  });
+                }
+              }
+            });
           }
         });
+        
+        // Convert to array and sort by importance and order (like key_feature)
+        const recommendedArray = Array.from(recommendedMeasurements.values())
+          .sort((a, b) => {
+            if (b.importance !== a.importance) {
+              return b.importance - a.importance;
+            }
+            return a.order - b.order;
+          });
+        
+        measurements.push(...recommendedArray);
       }
-    });
+    }
+    
+    // If no recommended measurements, add some common ones
+    if (measurements.length === 0) {
+      // Add common measurement fields if not present
+      if (!editedStructuredData.lv_systolic_function?.lvef) {
+        measurements.push({
+          category: 'lv_systolic_function',
+          field: 'lvef',
+          value: editedStructuredData.lv_systolic_function?.lvef || null
+        });
+      }
+      if (!editedStructuredData.lv_geometry?.LVEDD) {
+        measurements.push({
+          category: 'lv_geometry',
+          field: 'LVEDD',
+          value: editedStructuredData.lv_geometry?.LVEDD || null
+        });
+      }
+      if (!editedStructuredData.lv_geometry?.IVSd) {
+        measurements.push({
+          category: 'lv_geometry',
+          field: 'IVSd',
+          value: editedStructuredData.lv_geometry?.IVSd || null
+        });
+      }
+    }
+    
     return measurements;
   };
 
@@ -591,80 +793,6 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
                 />
               </div>
             ))}
-            
-            {/* Add common measurement fields if not present */}
-            {!editedStructuredData.lv_systolic_function?.lvef && (
-              <div className="measurement-field">
-                <label>LVEF (%)</label>
-                <input
-                  type="number"
-                  value={editedStructuredData.lv_systolic_function?.lvef || ''}
-                  onChange={(e) => handleNumericChange('lv_systolic_function', 'lvef', e.target.value)}
-                  step="0.1"
-                  placeholder="0.0"
-                />
-              </div>
-            )}
-            {!editedStructuredData.lv_geometry?.LVEDD && (
-              <div className="measurement-field">
-                <label>LVEDD (mm)</label>
-                <input
-                  type="number"
-                  value={editedStructuredData.lv_geometry?.LVEDD || ''}
-                  onChange={(e) => handleNumericChange('lv_geometry', 'LVEDD', e.target.value)}
-                  step="0.1"
-                  placeholder="0.0"
-                />
-              </div>
-            )}
-            {!editedStructuredData.lv_geometry?.IVSd && (
-              <div className="measurement-field">
-                <label>IVSd (mm)</label>
-                <input
-                  type="number"
-                  value={editedStructuredData.lv_geometry?.IVSd || ''}
-                  onChange={(e) => handleNumericChange('lv_geometry', 'IVSd', e.target.value)}
-                  step="0.1"
-                  placeholder="0.0"
-                />
-              </div>
-            )}
-                        {!editedStructuredData.lv_geometry?.IVSd && (
-              <div className="measurement-field">
-                <label>IVSd (mm)</label>
-                <input
-                  type="number"
-                  value={editedStructuredData.lv_geometry?.IVSd || ''}
-                  onChange={(e) => handleNumericChange('lv_geometry', 'IVSd', e.target.value)}
-                  step="0.1"
-                  placeholder="0.0"
-                />
-              </div>
-            )}
-                        {!editedStructuredData.lv_geometry?.IVSd && (
-              <div className="measurement-field">
-                <label>IVSd (mm)</label>
-                <input
-                  type="number"
-                  value={editedStructuredData.lv_geometry?.IVSd || ''}
-                  onChange={(e) => handleNumericChange('lv_geometry', 'IVSd', e.target.value)}
-                  step="0.1"
-                  placeholder="0.0"
-                />
-              </div>
-            )}
-                        {!editedStructuredData.lv_geometry?.IVSd && (
-              <div className="measurement-field">
-                <label>IVSd (mm)</label>
-                <input
-                  type="number"
-                  value={editedStructuredData.lv_geometry?.IVSd || ''}
-                  onChange={(e) => handleNumericChange('lv_geometry', 'IVSd', e.target.value)}
-                  step="0.1"
-                  placeholder="0.0"
-                />
-              </div>
-            )}
             
           </div>
         </div>
@@ -790,8 +918,9 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     const panelRect = summaryPanel.getBoundingClientRect();
     const newHeight = e.clientY - panelRect.top;
     
-    // Constrain height between 50px and 800px
-    const constrainedHeight = Math.max(50, Math.min(500, newHeight));
+    // Constrain height between 50px and 80% of viewport height
+    const maxHeight = Math.floor(window.innerHeight * 0.8);
+    const constrainedHeight = Math.max(50, Math.min(maxHeight, newHeight));
     setSummaryHeight(constrainedHeight);
   }, [isResizing]);
 
@@ -899,6 +1028,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     }));
   }, [summaryKeywords]);
   const hasGeneratedLeftPanelVideosRef = useRef(false);
+  const hasGeneratedSummaryRef = useRef(false);
 
   // Video segment names for echocardiography
   const segmentNames = [
@@ -1097,7 +1227,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       setStructuredData(structured);
       setPatientData(patient);
       
-      // Regenerate summary
+      // Reset summary generation flag and regenerate summary
+      hasGeneratedSummaryRef.current = false;
       await handleGenerateSummary();
     }
   };
@@ -1154,18 +1285,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     // Use provided socket or fall back to state socket
     const activeSocket = wsSocket || socket;
     
-    // Prevent duplicate execution
-    if (isGeneratingSummary) {
-      console.log('⚠️ Summary generation already in progress, skipping...');
-      return;
-    }
-    
-    // Prevent execution if summary already exists and keywords are extracted
-    if (summary && summaryKeywords.length > 0) {
-      console.log('⚠️ Summary and keywords already exist, skipping generation...');
-      return;
-    }
-    
     // Check if WebSocket is connected
     if (!activeSocket || !activeSocket.connected) {
       console.log('⚠️ WebSocket not connected, waiting for connection...');
@@ -1201,6 +1320,27 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   
   // Public wrapper for summary generation
   const handleGenerateSummary = async () => {
+    // Prevent duplicate execution using ref
+    if (hasGeneratedSummaryRef.current) {
+      console.log('⚠️ Summary already generated, skipping...');
+      return;
+    }
+    
+    // Prevent duplicate execution
+    if (isGeneratingSummary) {
+      console.log('⚠️ Summary generation already in progress, skipping...');
+      return;
+    }
+    
+    // Prevent execution if summary already exists and keywords are extracted
+    if (summary && summaryKeywords.length > 0) {
+      console.log('⚠️ Summary and keywords already exist, skipping generation...');
+      hasGeneratedSummaryRef.current = true; // Mark as generated
+      return;
+    }
+    
+    hasGeneratedSummaryRef.current = true; // Mark as generating
+    
     if (socket && socket.connected) {
       await handleGenerateSummaryWS(socket);
     } else {
@@ -1260,21 +1400,82 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
   // Filter videos based on keyword category and view_attention
   const filterVideosByKeyword = (keywordObj) => {
-    if (!allVideosData || allVideosData.length === 0) return [];
+    if (!allVideosData || allVideosData.length === 0) {
+      console.log('❌ No video data available');
+      return [];
+    }
     
     // Handle multiple categories
     const categories = Array.isArray(keywordObj.category) ? keywordObj.category : [keywordObj.category];
+    console.log('🔍 Filtering videos for categories:', categories);
+    console.log('📊 Total videos available:', allVideosData.length);
     
     // Filter videos by keyword categories
     let filtered = allVideosData.filter(video => 
       categories.includes(video.category)
     );
     
+    console.log('📹 Videos after category filtering:', filtered.length);
+    console.log('📹 Category distribution:', filtered.reduce((acc, video) => {
+      acc[video.category] = (acc[video.category] || 0) + 1;
+      return acc;
+    }, {}));
+    
     // Sort by weight (view_attention) - highest first
     filtered.sort((a, b) => b.weight - a.weight);
     
-    // Return top 5 videos with highest view_attention
-    return filtered.slice(0, 5);
+    // Remove duplicates based on fname (file name) while maintaining order
+    const uniqueVideos = [];
+    const seenFnames = new Set();
+    
+    // Take more videos initially to ensure we get 5 unique ones
+    const initialCount = Math.min(filtered.length, 50); // Take up to 50 videos initially
+    
+    console.log('🔍 Checking first', initialCount, 'videos for uniqueness...');
+    
+    for (let i = 0; i < initialCount; i++) {
+      const video = filtered[i];
+      if (!seenFnames.has(video.fname)) {
+        seenFnames.add(video.fname);
+        uniqueVideos.push(video);
+        console.log(`✅ Added unique video ${i + 1}: ${video.fname} (${video.category})`);
+        
+        // Stop when we have 5 unique videos
+        if (uniqueVideos.length >= 5) {
+          console.log('🎯 Found 5 unique videos, stopping search');
+          break;
+        }
+      } else {
+        console.log(`⚠️ Skipped duplicate video: ${video.fname} (${video.category})`);
+      }
+    }
+    
+    console.log('📊 Final unique videos found:', uniqueVideos.length);
+    
+    // If we don't have enough videos from the specific categories, add videos from other categories
+    if (uniqueVideos.length < 5) {
+      console.log('⚠️ Not enough videos from specific categories, adding from other categories...');
+      
+      // Get videos from other categories
+      const otherVideos = allVideosData.filter(video => 
+        !categories.includes(video.category)
+      ).sort((a, b) => b.weight - a.weight);
+      
+      // Add unique videos from other categories
+      for (let i = 0; i < otherVideos.length && uniqueVideos.length < 5; i++) {
+        const video = otherVideos[i];
+        if (!seenFnames.has(video.fname)) {
+          seenFnames.add(video.fname);
+          uniqueVideos.push(video);
+          console.log(`✅ Added video from other category: ${video.fname} (${video.category})`);
+        }
+      }
+      
+      console.log('📊 Final videos after adding from other categories:', uniqueVideos.length);
+    }
+    
+    // Return up to 5 unique videos with highest view_attention
+    return uniqueVideos.slice(0, 5);
   };
 
   // Debounced scroll handler
@@ -1507,6 +1708,9 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const handleInputClick = useCallback(() => {
     if (!isChatActive) {
       console.log('💬 Activating chat mode with click');
+      // Set initial height to 50vh (half of viewport)
+      const initialHeight = Math.floor(window.innerHeight * 0.5);
+      setSummaryHeight(initialHeight);
       performChatTransition(true);
       setIsChatActive(true);
     }
@@ -1595,7 +1799,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
   // Initialize WebSocket connection and start summary generation on patient selection
   useEffect(() => {
-    const wsUrl = process.env.REACT_APP_WS_URL || 'http://localhost:3002';
+    const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:3002';
     console.log('🔌 Connecting to WebSocket immediately:', wsUrl);
     
     // Connect to WebSocket
@@ -1606,12 +1810,15 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       reconnectionAttempts: 10, // Increase attempts
       reconnectionDelay: 500, // Faster reconnection
       timeout: 10000, // Faster timeout
+      forceNew: true, // Force new connection
+      autoConnect: true
     });
 
     newSocket.on('connect', () => {
       console.log('✅ Connected to chat server');
       setIsConnected(true);
       console.log('🚀 WebSocket ready for chat!');
+      // Don't auto-generate summary on connection - only on initial load
     });
 
     newSocket.on('connect_error', (error) => {
@@ -1721,8 +1928,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         const finalSummary = streamingSummary || summary;
         setSummary(finalSummary);
         
-        // Build structured data and extract keywords (mirror HTTP flow)
-        if (finalSummary) {
+        // Build structured data and extract keywords (only if not already extracted)
+        if (finalSummary && summaryKeywords.length === 0) {
           (async () => {
             try {
               const structured = structurePatientData(patientData);
@@ -1743,6 +1950,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               setIsExtractingKeywords(false);
             }
           })();
+        } else if (summaryKeywords.length > 0) {
+          console.log('ℹ️ Keywords already extracted, skipping...');
         }
       }
       
@@ -1856,9 +2065,13 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         if (newSummary) {
           setSummary(newSummary);
           
-          // Re-extract keywords for the new summary
-          console.log('🔑 Re-extracting keywords for new summary...');
-          await handleKeywordExtraction(newSummary);
+          // Re-extract keywords for the new summary (only if not already extracted)
+          if (summaryKeywords.length === 0) {
+            console.log('🔑 Re-extracting keywords for new summary...');
+            await handleKeywordExtraction(newSummary);
+          } else {
+            console.log('ℹ️ Keywords already extracted, skipping...');
+          }
           
           console.log('✅ Summary regenerated successfully');
         } else {
@@ -2025,11 +2238,22 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     // Generate all video URLs
     const allGeneratedVideos = await generateVideoUrls(allVideos);
     
-    // Store all videos and extract categories
-    setAllVideosData(allGeneratedVideos);
+    // Remove duplicates based on fname (file name)
+    const uniqueVideos = [];
+    const seenFnames = new Set();
+    
+    allGeneratedVideos.forEach(video => {
+      if (!seenFnames.has(video.fname)) {
+        seenFnames.add(video.fname);
+        uniqueVideos.push(video);
+      }
+    });
+    
+    // Store unique videos and extract categories
+    setAllVideosData(uniqueVideos);
     
     // Extract categories and handle general subcategories
-    const categories = [...new Set(allGeneratedVideos.map(v => v.category))];
+    const categories = [...new Set(uniqueVideos.map(v => v.category))];
     const processedCategories = categories.map(cat => {
       // Map general subcategories to 'general'
       if (['image_quality', 'cardiac_rhythm_abnormality', 'cardiac_rhythm'].includes(cat)) {
@@ -2043,8 +2267,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     setAvailableCategories(uniqueCategories);
     
     // Get top 10 videos overall and top 10 keyword-relevant videos
-    const generalVideos = allGeneratedVideos.slice(0, 10);
-    const keywordSpecificVideos = allGeneratedVideos
+    const generalVideos = uniqueVideos.slice(0, 10);
+    const keywordSpecificVideos = uniqueVideos
       .filter(v => v.isRelevant)
       .slice(0, 10);
 
@@ -2074,10 +2298,67 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       }
     }
     
-    // Sort by weight (highest first) and return top 6
-    return filtered
-      .sort((a, b) => b.weight - a.weight)
-      .slice(0, 6);
+    // Sort by weight (highest first)
+    filtered.sort((a, b) => b.weight - a.weight);
+    
+    // Remove duplicates based on fname (file name)
+    const uniqueVideos = [];
+    const seenFnames = new Set();
+    
+    console.log('🔍 Video-panel filtering for category:', selectedVideoCategory);
+    console.log('📊 Total videos before deduplication:', filtered.length);
+    
+    // Take more videos initially to ensure we get 6 unique ones
+    const initialCount = Math.min(filtered.length, 50);
+    
+    for (let i = 0; i < initialCount; i++) {
+      const video = filtered[i];
+      if (!seenFnames.has(video.fname)) {
+        seenFnames.add(video.fname);
+        uniqueVideos.push(video);
+        console.log(`✅ Added unique video ${i + 1}: ${video.fname} (${video.category})`);
+        
+        // Stop when we have 6 unique videos
+        if (uniqueVideos.length >= 6) {
+          console.log('🎯 Found 6 unique videos, stopping search');
+          break;
+        }
+      } else {
+        console.log(`⚠️ Skipped duplicate video: ${video.fname} (${video.category})`);
+      }
+    }
+    
+    console.log('📊 Final unique videos found:', uniqueVideos.length);
+    
+    // If we don't have enough videos from the specific categories, add videos from other categories
+    if (uniqueVideos.length < 6) {
+      console.log('⚠️ Not enough videos from specific categories, adding from other categories...');
+      
+      // Get videos from other categories
+      const otherVideos = allVideosData.filter(video => {
+        if (selectedVideoCategory === 'all') return false;
+        if (selectedVideoCategory === 'general') {
+          const generalSubCategories = ['image_quality', 'cardiac_rhythm_abnormality', 'cardiac_rhythm'];
+          return !generalSubCategories.includes(video.category);
+        }
+        return video.category !== selectedVideoCategory;
+      }).sort((a, b) => b.weight - a.weight);
+      
+      // Add unique videos from other categories
+      for (let i = 0; i < otherVideos.length && uniqueVideos.length < 6; i++) {
+        const video = otherVideos[i];
+        if (!seenFnames.has(video.fname)) {
+          seenFnames.add(video.fname);
+          uniqueVideos.push(video);
+          console.log(`✅ Added video from other category: ${video.fname} (${video.category})`);
+        }
+      }
+      
+      console.log('📊 Final videos after adding from other categories:', uniqueVideos.length);
+    }
+    
+        // Return exactly 6 videos (or fewer if not enough available)
+    return uniqueVideos.slice(0, 6);
   };
 
 
@@ -2657,6 +2938,12 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
             className={`summary-section ${isSummaryEditMode ? 'edit-mode' : ''} ${!summary ? 'empty-summary' : ''}`}
             style={isChatActive ? { height: `${summaryHeight}px` } : {}}
           >
+            {isChatActive && (
+              <div 
+                className="resize-handle"
+                onMouseDown={handleResizeStart}
+              />
+            )}
             <div className="panel-header">
               <div className="panel-title">
                 <div className="ai-icon">
@@ -2914,8 +3201,38 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         {/* EDIT PANEL - Slides in from right */}
         <div className={`edit-panel ${showDetailPanel ? 'active' : ''}`}>
           <div className="edit-header">
+            <button 
+              className="back-button"
+              onClick={closeDetailPanel}
+              title="Back to normal view"
+            >
+              ← Back
+            </button>
             <h2>EchoPilot Analysis</h2>
           </div>
+          
+          {/* Category Info Section */}
+          {keywordFilteredVideos.length > 0 && (
+            <div className="edit-category-info">
+              <div className="category-info-content">
+                <span className="category-label">Selected Categories:</span>
+                <div className="category-tags">
+                  {[...new Set(keywordFilteredVideos.map(video => video.category))].map((category, index) => (
+                    <span key={index} className="category-tag">
+                      {category
+                        .replace(/_/g, ' ')
+                        .replace(/\b\w/g, l => l.toUpperCase())
+                        .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase())
+                      }
+                    </span>
+                  ))}
+                </div>
+                <span className="video-count">
+                  {keywordFilteredVideos.length} videos selected
+                </span>
+              </div>
+            </div>
+          )}
           
           {/* Video Grid Section */}
           <div className="edit-video-section">
@@ -3086,9 +3403,9 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         <div className="footer-content">
           <div className="footer-left"></div>
           <div className="footer-right">
-            <button className="final-report-button">
+            {/* <button className="final-report-button">
               <span>Final Report</span>
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

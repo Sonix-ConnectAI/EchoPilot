@@ -108,8 +108,22 @@ standardized_structure = {
 }
 
 app = Flask(__name__)
-# Enable CORS for all routes
-CORS(app, origins="*", allow_headers=["Content-Type"])
+
+# Load environment variables (optional)
+try:
+    from dotenv import load_dotenv  # type: ignore
+    # Best-effort load; start_server.py will also load root/backend .env
+    load_dotenv()
+except Exception as e:  # ModuleNotFoundError or other
+    logger.warning(f"Could not load .env via python-dotenv ({e}); continuing with OS environment only")
+
+# CORS configuration from environment
+cors_origins = os.environ.get('CORS_ORIGINS', '*')
+if cors_origins == '*':
+    CORS(app, origins="*", allow_headers=["Content-Type"], supports_credentials=True)
+else:
+    origins_list = [origin.strip() for origin in cors_origins.split(',')]
+    CORS(app, origins=origins_list, allow_headers=["Content-Type"], supports_credentials=True)
 
 @app.route('/api/convert-npz', methods=['GET'])
 def convert_npz_to_mp4():
@@ -528,7 +542,13 @@ def generate_struct_pred():
         if not data:
             return jsonify({"error": "Missing JSON data"}), 400
         
-        db_json_path = "../DB_json/eval_result-attn-50-3_local.json"
+        # Resolve DB JSON path relative to project root, allow env override
+        db_json_path_env = os.environ.get('DB_JSON_PATH')
+        if db_json_path_env and db_json_path_env.strip():
+            db_json_path = db_json_path_env.strip()
+        else:
+            project_root = Path(__file__).resolve().parent.parent
+            db_json_path = str(project_root / 'DB_json' / 'eval_result-attn-50-3_local.json')
         exam_id = data.get('exam_id')
         mode = data.get('mode', 'pred_label')
         
@@ -1004,16 +1024,18 @@ def internal_error(error):
 
 if __name__ == '__main__':
     # Run the Flask app
-    port = int(os.environ.get('PORT', 5000))
+    host = os.environ.get('FLASK_RUN_HOST', '0.0.0.0')
+    port = int(os.environ.get('FLASK_RUN_PORT', os.environ.get('PORT', 5000)))
     debug = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
     
-    logger.info(f"Starting Flask server on port {port}")
+    logger.info(f"Starting Flask server on {host}:{port}")
     logger.info(f"Debug mode: {debug}")
+    logger.info(f"CORS origins: {cors_origins}")
     logger.info(f"OpenCV version: {cv2.__version__}")
     logger.info(f"NumPy version: {np.__version__}")
     
     app.run(
-        host='0.0.0.0',  # Allow external connections
+        host=host,
         port=port,
         debug=debug
     )
