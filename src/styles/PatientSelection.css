@@ -383,3 +383,10 @@
   color: var(--primary-white);
   font-weight: 500;
 }
+
+.submitting-subtext {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}

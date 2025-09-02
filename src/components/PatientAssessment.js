@@ -878,6 +878,9 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [originalPatientData, setOriginalPatientData] = useState(null); // Backup of original data
   const [isUpdatingStructuredData, setIsUpdatingStructuredData] = useState(false); // Loading state for AI update
   const [isChatActive, setIsChatActive] = useState(false);
+  const [chatMinimized, setChatMinimized] = useState(true);
+  const [savedChatHeight, setSavedChatHeight] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
   const panelTransitionTimeoutRef = useRef(null);
   const scrollTimeoutRef = useRef(null);
   const isTransitioningRef = useRef(false);
@@ -892,7 +895,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [summaryHeight, setSummaryHeight] = useState(50); // Default height for summary section
+  const [summaryHeight, setSummaryHeight] = useState(90); // Initial state: 90% summary, 10% chat
   const [isResizing, setIsResizing] = useState(false);
 
   
@@ -901,36 +904,69 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [analysisStatus, setAnalysisStatus] = useState(''); // 'Analyzing AI data', 'Analysis failed'
   const [streamingSummary, setStreamingSummary] = useState(''); // For real-time streaming display
 
-  // Resize functionality
+  // Enhanced resize functionality with performance optimization
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
     setIsResizing(true);
+    setIsDragging(true);
     document.body.style.cursor = 'ns-resize';
     document.body.style.userSelect = 'none';
-  }, []);
+    
+    // Add dragging class for visual feedback
+    const summaryPanel = document.querySelector('.summary-panel');
+    if (summaryPanel) {
+      summaryPanel.classList.add('dragging');
+    }
+    
+    // Save current height before dragging
+    if (!chatMinimized) {
+      setSavedChatHeight(100 - summaryHeight);
+    }
+  }, [summaryHeight, chatMinimized]);
 
   const handleResizeMove = useCallback((e) => {
-    if (!isResizing) return;
+    if (!isResizing || !isDragging) return;
     
     const summaryPanel = document.querySelector('.summary-panel');
     if (!summaryPanel) return;
     
     const panelRect = summaryPanel.getBoundingClientRect();
-    const newHeight = e.clientY - panelRect.top;
+    const relativeY = e.clientY - panelRect.top;
+    const newSummaryRatio = (relativeY / panelRect.height) * 100;
     
-    // Constrain height between 50px and 80% of viewport height
-    const maxHeight = Math.floor(window.innerHeight * 0.8);
-    const constrainedHeight = Math.max(50, Math.min(maxHeight, newHeight));
-    setSummaryHeight(constrainedHeight);
-  }, [isResizing]);
+    // Constrain ratios between 25% and 75% (minimum 150px equivalent)
+    const constrainedRatio = Math.max(25, Math.min(75, newSummaryRatio));
+    setSummaryHeight(constrainedRatio);
+    
+    // Real-time visual feedback using requestAnimationFrame
+    requestAnimationFrame(() => {
+      const summarySection = summaryPanel.querySelector('.summary-section');
+      const chatSection = summaryPanel.querySelector('.chatbot-section');
+      
+      if (summarySection && chatSection) {
+        summarySection.style.flex = `0 0 ${constrainedRatio}%`;
+        chatSection.style.flex = `0 0 ${100 - constrainedRatio}%`;
+      }
+    });
+  }, [isResizing, isDragging]);
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
+    setIsDragging(false);
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-  }, []);
+    
+    // Remove dragging class and clean up
+    const summaryPanel = document.querySelector('.summary-panel');
+    if (summaryPanel) {
+      summaryPanel.classList.remove('dragging');
+    }
+    
+    // Save the final height
+    setSavedChatHeight(100 - summaryHeight);
+  }, [summaryHeight]);
 
-  // Add resize event listeners
+  // Enhanced resize event listeners with performance optimization
   useEffect(() => {
     if (isResizing) {
       document.addEventListener('mousemove', handleResizeMove);
@@ -942,6 +978,64 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       };
     }
   }, [isResizing, handleResizeMove, handleResizeEnd]);
+
+  // Debounced window resize handler to maintain ratios
+  const windowResizeTimeoutRef = useRef(null);
+  const handleWindowResize = useCallback(() => {
+    if (windowResizeTimeoutRef.current) {
+      clearTimeout(windowResizeTimeoutRef.current);
+    }
+    
+    windowResizeTimeoutRef.current = setTimeout(() => {
+      // Maintain panel ratios during window resize
+      if (isChatActive) {
+        const summaryPanel = document.querySelector('.summary-panel');
+        if (summaryPanel) {
+          requestAnimationFrame(() => {
+            const summarySection = summaryPanel.querySelector('.summary-section');
+            const chatSection = summaryPanel.querySelector('.chatbot-section');
+            
+            if (summarySection && chatSection) {
+              summarySection.style.flex = `0 0 ${summaryHeight}%`;
+              chatSection.style.flex = `0 0 ${100 - summaryHeight}%`;
+            }
+          });
+        }
+      }
+    }, 150); // Debounce window resize events
+  }, [isChatActive, summaryHeight]);
+
+  // Window resize event listener
+  useEffect(() => {
+    window.addEventListener('resize', handleWindowResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
+      if (windowResizeTimeoutRef.current) {
+        clearTimeout(windowResizeTimeoutRef.current);
+      }
+    };
+  }, [handleWindowResize]);
+
+  // Performance optimization: cleanup all timeouts on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup all timeout references
+      if (windowResizeTimeoutRef.current) clearTimeout(windowResizeTimeoutRef.current);
+      if (panelTransitionTimeoutRef.current) clearTimeout(panelTransitionTimeoutRef.current);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      
+      // Reset cursor and user select
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      
+      // Remove any lingering classes
+      const summaryPanel = document.querySelector('.summary-panel');
+      if (summaryPanel) {
+        summaryPanel.classList.remove('dragging', 'chat-animating');
+      }
+    };
+  }, []);
 
   
   // Cache for regex patterns to avoid recompilation
@@ -1640,10 +1734,22 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   };
 
 
-  // Performance-optimized chat animation control
+  // Enhanced performance-optimized chat animation control
   const performChatTransition = useCallback((activate) => {
     const summaryPanel = document.querySelector('.summary-panel');
     if (!summaryPanel) return;
+
+    // Update state variables
+    setChatMinimized(!activate);
+    
+    // If expanding, use saved height or default to 50:50
+    if (activate) {
+      const targetSummaryHeight = savedChatHeight > 0 ? 100 - savedChatHeight : 50;
+      setSummaryHeight(targetSummaryHeight);
+    } else {
+      // Collapsing to minimized state (90:10)
+      setSummaryHeight(90);
+    }
 
     // Step 1: Add animating class and prepare for GPU acceleration
     requestAnimationFrame(() => {
@@ -1667,12 +1773,12 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           
           if (summarySection) summarySection.style.willChange = 'auto';
           if (chatbotSection) chatbotSection.style.willChange = 'auto';
-        }, 600); // Match CSS transition duration
+        }, 400); // Match CSS transition duration
       });
     });
-  }, []);
+  }, [savedChatHeight]);
 
-  // Chat activation with Enter key only
+  // Enhanced chat key handling with ESC functionality
   const handleKeyDown = useCallback((event) => {
     
     if (event.key === 'Enter') {
@@ -1701,16 +1807,25 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           checkConnection();
         }
       }
+    } else if (event.key === 'Escape' && isChatActive) {
+      // ESC key to minimize chat
+      event.preventDefault();
+      console.log('💬 ESC pressed - minimizing chat');
+      performChatTransition(false);
+      setIsChatActive(false);
+      
+      // Clear input and remove focus
+      if (chatInputRef.current) {
+        chatInputRef.current.value = '';
+        chatInputRef.current.blur();
+      }
     }
-  }, [isChatActive, socket, isConnected]);
+  }, [isChatActive, socket, isConnected, performChatTransition]);
 
   // Chat activation with click
   const handleInputClick = useCallback(() => {
     if (!isChatActive) {
       console.log('💬 Activating chat mode with click');
-      // Set initial height to 50vh (half of viewport)
-      const initialHeight = Math.floor(window.innerHeight * 0.5);
-      setSummaryHeight(initialHeight);
       performChatTransition(true);
       setIsChatActive(true);
     }
@@ -2936,14 +3051,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           {/* AI Summary Section */}
           <div 
             className={`summary-section ${isSummaryEditMode ? 'edit-mode' : ''} ${!summary ? 'empty-summary' : ''}`}
-            style={isChatActive ? { height: `${summaryHeight}px` } : {}}
+            style={isChatActive ? { flex: `0 0 ${summaryHeight}%` } : { flex: '0 0 90%' }}
           >
-            {isChatActive && (
-              <div 
-                className="resize-handle"
-                onMouseDown={handleResizeStart}
-              />
-            )}
             <div className="panel-header">
               <div className="panel-title">
                 <div className="ai-icon">
@@ -3069,6 +3178,14 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                aria-expanded={isChatActive}
                aria-hidden={!isChatActive && showDetailPanel}
                aria-live="polite">
+            
+            {/* Click to Start Chat prompt when minimized */}
+            {!isChatActive && (
+              <div className="chat-start-prompt">
+                Click to start chat
+              </div>
+            )}
+            
             {isChatActive && (
               <div className="chat-messages-area">
                 <div className="chat-header">
@@ -3401,11 +3518,16 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       {/* Footer */}
       <div className="footer">
         <div className="footer-content">
-          <div className="footer-left"></div>
+          <div className="footer-left">
+            <button className="back-button" onClick={onBack}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M10 3l-5 5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Back
+            </button>
+          </div>
           <div className="footer-right">
-            {/* <button className="final-report-button">
-              <span>Final Report</span>
-            </button> */}
+            {/* Footer right content */}
           </div>
         </div>
       </div>

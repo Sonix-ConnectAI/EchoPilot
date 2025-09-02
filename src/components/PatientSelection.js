@@ -95,6 +95,7 @@ const PatientSelection = ({ onPatientSelect }) => {
           ...patient,
           struct_pred: data.struct_pred
         };
+        // Immediately call onPatientSelect to show processing overlay
         onPatientSelect(enrichedPatient);
       } else {
         throw new Error(data.error || 'Failed to generate structured prediction');
@@ -102,9 +103,9 @@ const PatientSelection = ({ onPatientSelect }) => {
     } catch (err) {
       console.error('❌ Error generating struct_pred:', err);
       setSubmitError(err.message || 'Failed to connect to backend');
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Only reset if there's an error
     }
+    // Don't reset isSubmitting here - let the processing overlay handle it
   };
 
   return (
@@ -177,7 +178,8 @@ const PatientSelection = ({ onPatientSelect }) => {
               <div className="submitting-overlay">
                 <div className="submitting-content">
                   <div className="loading-spinner"></div>
-                  <p className="submitting-text">Fetching structured data...</p>
+                  <p className="submitting-text">Preparing patient data...</p>
+                  <p className="submitting-subtext">This may take a few moments</p>
                 </div>
               </div>
             )}

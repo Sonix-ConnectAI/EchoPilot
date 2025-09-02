@@ -238,11 +238,33 @@
 
 .footer-left {
   flex: 1;
+  display: flex;
+  align-items: center;
 }
 
 .footer-right {
   display: flex;
   align-items: center;
+}
+
+/* Footer Buttons */
+.footer .back-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer .back-button:active {
+  transform: translateX(0);
 }
 
 .final-report-button {
@@ -321,6 +343,19 @@
   color: #ffffff;
   font-size: 14px;
   line-height: 1.6;
+  /* Prevent unwanted line breaks */
+  word-break: keep-all;
+  hyphens: none;
+  /* Prevent layout shifts */
+  contain: layout style;
+  /* Ensure consistent text rendering */
+  text-rendering: optimizeLegibility;
+  /* Prevent text reflow during size changes */
+  min-width: 0;
+  box-sizing: border-box;
+  /* Maintain text integrity */
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .summary-line:last-child {
@@ -837,9 +872,10 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px; /* Add gap for section separation in default state */
   contain: layout style paint; /* Optimize reflow and repaint */
   backface-visibility: hidden;
+  /* Ensure chatbot-section stays within bounds - use absolute positioning but make children relative */
 }
 
 .summary-panel .panel-title {
@@ -1076,11 +1112,19 @@
 .summary-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scroll */
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   margin-top: 0;
-  padding: 0px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
+  /* Prevent layout shifts during size changes */
+  contain: layout style;
+  /* Ensure smooth scrolling */
+  scroll-behavior: smooth;
+  /* Prevent text reflow issues */
+  word-break: keep-all;
+  hyphens: none;
 }
 
 /* Summary Section Panel Header */
@@ -1153,9 +1197,19 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   white-space: pre-wrap;
   word-wrap: break-word;
+  word-break: keep-all; /* Prevent unwanted line breaks */
+  hyphens: none; /* Disable automatic hyphenation */
   margin: 0;
   max-height: 400px;
   overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  /* Prevent layout shifts */
+  contain: layout style;
+  /* Ensure consistent text rendering */
+  text-rendering: optimizeLegibility;
+  /* Prevent text reflow during size changes */
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Summary Block Styles */
@@ -2879,12 +2933,13 @@
 
 /* Compact styling for attention-based video grids */
 .video-section .video-card {
-  min-height: auto;
+  min-height: 200px;
+  height: auto;
 }
 
 .video-section .video-container {
   padding-top: 56.25%; /* 16:9 aspect ratio for better fit */
-  max-height: 180px;
+  min-height: 200px;
   position: relative;
 }
 
@@ -3046,7 +3101,8 @@
 
 .video-panel .video-card {
   height: 100%;
-  min-height: 200px;
+  width: 100%;
+  min-height: 220px;
 }
 
 .video-panel .video-container {
@@ -3088,7 +3144,7 @@
   
   .video-panel .video-card {
     height: 100%;
-    min-height: 150px;
+    min-height: 180px;
   }
 }
 
@@ -3444,74 +3500,111 @@
 /* AI Chatbot Section - Flexbox for proper expansion */
 .chatbot-section {
   position: relative;
-  flex: 0 0 40px; /* Default: fixed 60px height */
+  flex: 0 0 56px; /* Fixed height for minimized state */
   background: #1D212B;
   border-radius: 35px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden; /* Prevent content overflow */
   transform: translateZ(0); /* GPU acceleration */
-  transition: flex 0.6s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   contain: layout style paint;
   z-index: 2;
   backface-visibility: hidden;
+  /* Ensure chatbot-section stays within summary-panel bounds */
+  max-width: 100%;
+  box-sizing: border-box;
+  /* Ensure it doesn't overflow the parent */
+  width: 100%;
+  /* Remove padding and margin to prevent overflow */
+  padding: 0;
+  margin: 0;
+  /* Add margin top for separation from summary section */
+  margin-top: 8px;
+  /* Ensure fixed height for input */
+  min-height: 56px;
+  max-height: 56px; /* Prevent height changes */
+  /* Remove justify-content for centering to work */
 }
 
-/* Chat Expanded Mode - Take remaining space */
+/* Chat Expanded Mode - Fixed 2:1 ratio */
 .summary-panel.chat-active .chatbot-section {
-  flex: 1; /* Take half of the space */
+  flex: 0 0 66.67%; /* 2/3 height (2 parts) */
   background: linear-gradient(to top, #1A1D24 0%, #1F232D 100%);
   border-radius: 5px;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
   will-change: flex;
-  min-height: 200px; /* Minimum chat height */
-  max-height: 100vh; /* Maximum chat height - half of viewport */
+  min-height: 150px; /* Minimum chat height */
+  max-height: calc(66.67%); /* Constrain height to prevent overflow */
   overflow: hidden;
+  /* Ensure chatbot-section stays within summary-panel bounds */
+  max-width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  /* Ensure it doesn't overflow the parent */
+  width: 100%;
+  /* Add padding for expanded state */
+  padding: 8px;
+  margin: 0;
+  /* Add margin top for separation */
+  margin-top: 8px;
+  /* Ensure input space at bottom */
+  padding-bottom: 8px; /* Reduced padding to show input */
+  /* Ensure smooth transitions */
+  transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Ensure input is visible at bottom in expanded state */
+  justify-content: flex-end; /* Align input to bottom */
 }
 
 /* Summary Section - Flexbox control */
 .summary-section {
-  flex: 1; /* Default: take all available space */
+  flex: 1; /* Take remaining space instead of fixed percentage */
   position: relative;
   display: flex;
   flex-direction: column;
   transform: translateZ(0);
-  transition: flex 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   contain: layout style paint;
   backface-visibility: hidden;
   overflow: hidden;
+  /* Ensure summary-section stays within summary-panel bounds */
+  max-width: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+  /* Ensure it doesn't overflow the parent */
+  width: 100%;
+  /* Add padding for better spacing */
+  padding: 8px;
+  margin: 0;
+  /* Add margin bottom for separation from chatbot section */
+  margin-bottom: 8px;
 }
 
-/* Resize handle for summary section */
+/* Remove resize handle - no longer needed */
 .resize-handle {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  cursor: ns-resize;
-  transition: background 0.3s ease;
-  z-index: 10;
-}
-
-.resize-handle:hover {
-  background: rgba(255, 255, 255, 0.3) !important;
-}
-
-.resize-handle:active {
-  background: rgba(255, 255, 255, 0.5) !important;
+  display: none; /* Hide resize handle */
 }
 
 /* Summary section collapse during chat activation */
+/* Summary section collapse during chat activation - Fixed 1:2 ratio */
 .summary-panel.chat-active .summary-section {
-  flex: none; /* Use fixed height for resizing */
-  will-change: height;
+  flex: 0 0 33.33%; /* 1/3 height (1 part) */
   min-height: 50px; /* Minimum height */
-  max-height: 30vh; /* Maximum height - half of viewport */
+  max-height: calc(33.33% - 20px); /* Constrain height to prevent overflow */
   overflow: hidden;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 3px solid rgba(255, 255, 255, 0.3); /* Thicker and more visible border */
   position: relative;
+  /* Prevent layout shifts during size changes */
+  contain: layout style;
+  /* Ensure smooth transitions */
+  transition: flex 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Adjust padding for constrained space */
+  padding: 6px;
+  margin: 0;
+  /* Add margin bottom for separation */
+  margin-bottom: 8px;
+  /* Add subtle shadow for better separation */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* Summary content visible during chat mode */
@@ -3523,7 +3616,16 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 10px;
-  max-height: calc(100% - 20px);
+  max-height: none; /* Remove height constraint for fixed ratio */
+  /* Prevent layout shifts during size changes */
+  contain: layout style;
+  /* Ensure smooth scrolling */
+  scroll-behavior: smooth;
+  /* Prevent text reflow issues */
+  word-break: keep-all;
+  hyphens: none;
+  /* Maintain scroll position during size changes */
+  scroll-padding: 10px;
 }
 
 /* Custom scrollbar for summary content in chat mode */
@@ -3548,45 +3650,78 @@
 /* Chat Messages Area - Hidden by default, expands upward */
 .chat-messages-area {
   flex: 1;
-  display: flex; /* Always display, but hidden with opacity and transform */
+  display: none; /* Hidden by default */
   flex-direction: column;
   overflow: hidden;
   opacity: 0;
-  transform: translateY(100%) translateZ(0); /* Start from bottom */
+  transform: translateY(20px) translateZ(0);
   transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.2s, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
-  pointer-events: none; /* Disable interactions when hidden */
+}
+
+/* Click to Start Chat prompt */
+.chat-start-prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  pointer-events: none;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.summary-panel.chat-active .chat-start-prompt {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Chat Messages Area - Show when chat is active */
 .summary-panel.chat-active .chat-messages-area {
+  display: flex;
   opacity: 1;
   transform: translateY(0) translateZ(0);
-  pointer-events: auto; /* Enable interactions when visible */
-}
-
-/* Chat Messages Area - Hide when chat is closing (slide down) */
-.summary-panel:not(.chat-active) .chat-messages-area {
-  opacity: 0;
-  transform: translateY(100%) translateZ(0);
-  pointer-events: none; /* Disable interactions when hidden */
 }
 
 /* Chatbot Input - Always fixed at bottom */
 .chatbot-input {
-  flex: 0 0 40px; /* Always 60px height */
-  position: relative;
+  flex: 0 0 40px; /* Fixed height to match the other chatbot-input style */
+  position: absolute; /* Use absolute positioning for centering */
+  top: 50%; /* Center vertically */
+  left: 50%; /* Center horizontally */
+  transform: translate(-50%, -50%); /* Perfect centering */
   display: flex;
   align-items: center;
-  padding: 8px;
+  padding: 8px 12px; /* Increased padding */
   background: transparent;
   border-radius: 0 0 25px 25px; /* Rounded bottom corners in normal state */
-  transition: border-radius 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   /* No other transitions - stays fixed */
+  /* Ensure input is fully visible */
+  min-height: 40px;
+  max-height: 40px; /* Prevent overflow */
+  box-sizing: border-box;
+  z-index: 10; /* Ensure it's always on top */
+  /* Make sure it's visible */
+  background-color: #1D212B;
+  /* Set width for proper centering */
+  width: calc(100% - 16px); /* Account for parent padding */
 }
 
 /* Adjust border radius when chat is expanded */
 .summary-panel.chat-active .chatbot-input {
   border-radius: 0 0 5px 5px; /* Match expanded chatbot section */
+  position: absolute; /* Use absolute positioning */
+  top: auto; /* Remove top centering */
+  bottom: 0; /* Position at bottom */
+  left: 0; /* Align to left */
+  right: 0; /* Align to right */
+  transform: none; /* Remove centering transform */
+  z-index: 10; /* Ensure it's always on top */
+  /* Make sure it's visible in expanded state */
+  background-color: rgba(255, 255, 255, 0.15);
+  /* Set width for bottom positioning */
+  width: 100%;
 }
 
 /* Remove will-change after animation completes */
@@ -3617,6 +3752,20 @@
 /* Optimize layout containment during animations */
 .summary-panel.chat-active {
   contain: layout style paint size;
+  /* Ensure proper flex container behavior */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Remove gap since we're using margins for separation */
+  gap: 0;
+  /* Prevent layout shifts during size changes */
+  will-change: auto;
+  /* Ensure smooth transitions */
+  transition: none;
+  /* Prevent text reflow issues */
+  word-break: keep-all;
+  hyphens: none;
+  /* Remove dragging functionality */
 }
 
 /* Duplicate removed - using new flexbox implementation above */
@@ -3626,12 +3775,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .chat-title {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
   display: flex;
@@ -3741,13 +3889,23 @@
   background-color: #1D212B;
   border-radius: 200px;
   padding: 8px 28px;
-  height: 100%;
+  height: 40px; /* Fixed height instead of 100% */
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   width: 100%;
   border: none;
+  /* Ensure proper sizing */
+  min-height: 40px;
+  max-height: 40px; /* Prevent overflow */
+  box-sizing: border-box;
+  /* Add subtle border for better visibility */
+  /* Ensure it stays within bounds */
+  position: relative;
+  z-index: 5;
+  /* Make sure it's visible */
+  background-color: #1D212B !important;
 }
 
 .chatbot-section.chat-expanded .chatbot-input {
