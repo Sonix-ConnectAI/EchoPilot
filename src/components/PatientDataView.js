@@ -221,6 +221,7 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
 
   const handleContinueClick = useCallback(() => {
     if (onContinueToAssessment && patient) {
+      // 바로 Assessment 화면으로 이동
       onContinueToAssessment(patient);
     }
   }, [onContinueToAssessment, patient]);
@@ -445,6 +446,8 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
 
         </div>
       </div>
+
+
 
       {/* Footer */}
       <div className="page-footer">

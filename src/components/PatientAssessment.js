@@ -903,6 +903,11 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [connectionStatus, setConnectionStatus] = useState(''); // 'Connecting', 'Connected', 'Connection failed', 'Disconnected'
   const [analysisStatus, setAnalysisStatus] = useState(''); // 'Analyzing AI data', 'Analysis failed'
   const [streamingSummary, setStreamingSummary] = useState(''); // For real-time streaming display
+  
+  // Loading states for different phases
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [loadingPhase, setLoadingPhase] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('');
 
   // Enhanced resize functionality with performance optimization
   const handleResizeStart = useCallback((e) => {
@@ -1404,6 +1409,9 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       // Clear existing summary to show streaming
       setSummary('');
       
+      // Phase 4로 업데이트 (keywords extraction 대기)
+      updateLoadingPhase(4, 'Waiting for AI response...');
+      
     } catch (err) {
       console.error('❌ Failed to start summary generation:', err);
       setError('Failed to start AI summary generation. Please try again.');
@@ -1430,6 +1438,11 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     if (summary && summaryKeywords.length > 0) {
       console.log('⚠️ Summary and keywords already exist, skipping generation...');
       hasGeneratedSummaryRef.current = true; // Mark as generated
+      // Loading 완료 처리
+      updateLoadingPhase(5, 'Assessment ready!');
+      setTimeout(() => {
+        setIsInitializing(false);
+      }, 10000);
       return;
     }
     
@@ -1452,6 +1465,10 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     try {
       console.log('🔄 Starting AI summary generation via HTTP...');
       console.log('🔍 patientData:', patientData);
+      
+      // Phase 4로 업데이트 (keywords extraction 대기)
+      updateLoadingPhase(4, 'Generating AI summary...');
+      
       const aiSummary = await generateSummary(patientData);
       setSummary(aiSummary);
       console.log('✅ AI Summary generated');
@@ -1479,9 +1496,19 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           setSummaryKeywords([]);
         } finally {
           setIsExtractingKeywords(false);
+          // Update loading phase to complete
+          updateLoadingPhase(5, 'Assessment ready!');
+          setTimeout(() => {
+            setIsInitializing(false);
+          }, 10000);
         }
       } else if (summaryKeywords.length > 0) {
         console.log('ℹ️ Keywords already extracted, skipping...');
+        // Update loading phase to complete
+        updateLoadingPhase(5, 'Assessment ready!');
+        setTimeout(() => {
+          setIsInitializing(false);
+        }, 10000);
       }
     } catch (err) {
       console.error('❌ Failed to generate summary:', err);
@@ -2012,7 +2039,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         });
 
       } else if (data.type === 'summary') {
-        // Handle summary streaming with real-time display
+        // Handle summary streaming with real-time display (NOT adding to chat messages)
         console.log('📝 Summary chunk received:', data.content);
         setStreamingSummary(prev => prev + data.content);
         setSummary(prev => prev + data.content);
@@ -2029,7 +2056,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       setIsTyping(false);
     });
     
-    // Handle stream completion
+        // Handle stream completion
     newSocket.on('stream_complete', (data) => {
       console.log('✅ Stream completed:', data);
       setIsTyping(false);
@@ -2039,12 +2066,15 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         setAnalysisStatus('');
         setIsGeneratingSummary(false);
         
-        // Finalize the summary
+        // Finalize the summary (NOT adding to chat messages)
         const finalSummary = streamingSummary || summary;
         setSummary(finalSummary);
         
         // Build structured data and extract keywords (only if not already extracted)
         if (finalSummary && summaryKeywords.length === 0) {
+          // Update loading phase for keywords extraction
+          updateLoadingPhase(4, 'Extracting keywords...');
+          
           (async () => {
             try {
               const structured = structurePatientData(patientData);
@@ -2063,27 +2093,39 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               setSummaryKeywords([]);
             } finally {
               setIsExtractingKeywords(false);
+              // Update loading phase to complete
+              updateLoadingPhase(5, 'Assessment ready!');
+              setTimeout(() => {
+                setIsInitializing(false);
+              }, 10000);
             }
           })();
         } else if (summaryKeywords.length > 0) {
           console.log('ℹ️ Keywords already extracted, skipping...');
+          // Update loading phase to complete
+          updateLoadingPhase(5, 'Assessment ready!');
+          setTimeout(() => {
+            setIsInitializing(false);
+          }, 10000);
         }
       }
       
-      // Mark the last streaming message as complete
-      setMessages(prev => {
-        if (prev.length > 0) {
-          const lastMessage = prev[prev.length - 1];
-          if (lastMessage.isStreaming) {
-            return prev.map((msg, index) => 
-              index === prev.length - 1 
-                ? { ...msg, isStreaming: false }
-                : msg
-            );
+      // Mark the last streaming message as complete (only for chat messages, not summary)
+      if (data.type === 'chat') {
+        setMessages(prev => {
+          if (prev.length > 0) {
+            const lastMessage = prev[prev.length - 1];
+            if (lastMessage.isStreaming) {
+              return prev.map((msg, index) => 
+                index === prev.length - 1 
+                  ? { ...msg, isStreaming: false }
+                  : msg
+              );
+            }
           }
-        }
-        return prev;
-      });
+          return prev;
+        });
+      }
     });
 
 
@@ -2705,6 +2747,12 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     );
   };
 
+  // Loading phase management
+  const updateLoadingPhase = useCallback((phase, message) => {
+    setLoadingPhase(phase);
+    setLoadingMessage(message);
+  }, []);
+
   // Load video segments and generate summary on mount
   useEffect(() => {
     
@@ -2723,29 +2771,50 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       originalError.apply(console, args);
     };
     
-    loadVideoSegments();
-    
-    // Load exam entry first, then generate summary
-    const loadExamEntryAndGenerateSummary = async () => {
+    // Start loading sequence
+    const initializeAssessment = async () => {
       try {
-        console.log('🔍 Loading exam entry for exam_id:', patient.exam_id);
-        const entry = await getExamEntryById(patient.exam_id);
-        console.log('🔍 getExamEntryById result:', entry);
+        // Phase 1: Loading video segments (최소 1.5초 표시)
+        updateLoadingPhase(1, 'Loading video segments...');
+        const videoPromise = loadVideoSegments();
+        await Promise.all([
+          videoPromise,
+          new Promise(resolve => setTimeout(resolve, 1500))
+        ]);
         
+        // Phase 2: Loading exam entry (최소 1초 표시)
+        updateLoadingPhase(2, 'Loading exam data...');
+        const examPromise = getExamEntryById(patient.exam_id);
+        const [entry] = await Promise.all([
+          examPromise,
+          new Promise(resolve => setTimeout(resolve, 1000))
+        ]);
+        
+        console.log('🔍 getExamEntryById result:', entry);
         if (entry) {
           setExamEntry(entry);
         } else {
           console.warn('⚠️ No exam entry found for exam_id:', patient.exam_id);
         }
+        
+        // Phase 3: Generating AI summary (최소 2초 표시)
+        updateLoadingPhase(3, 'Generating AI summary...');
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        
+        // 이제 실제 summary 생성을 시작하되, loading은 유지
+        handleGenerateSummary();
+        
+        // Phase 4는 handleGenerateSummary 내에서 처리됨
+        
       } catch (err) {
-        console.error('❌ Failed to load exam entry:', err);
+        console.error('❌ Error during initialization:', err);
+        setError('Failed to initialize assessment. Please try again.');
+        setIsInitializing(false);
+        setLoadingPhase(0);
       }
-      
-          // Generate summary after exam entry is loaded (or attempted)
-      handleGenerateSummary();
     };
     
-    loadExamEntryAndGenerateSummary();
+    initializeAssessment();
     
     return () => {
       // Restore original console.error
@@ -2824,6 +2893,50 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
   return (
     <div className="patient-assessment">
+      
+      {/* Loading Overlay */}
+      {isInitializing && (
+        <div className="loading-overlay">
+          <div className="loading-modal">
+            {loadingPhase === 5 ? (
+              <div className="checkmark">✓</div>
+            ) : (
+              <div className="spinner"></div>
+            )}
+            <h3>{loadingPhase === 5 ? 'Assessment Complete!' : 'Initializing Assessment...'}</h3>
+            <div className="loading-steps">
+              <div className={`step ${loadingPhase >= 1 ? 'completed' : 'pending'}`}>
+                {loadingPhase >= 1 ? '✓' : '⏳'} Loading video segments
+              </div>
+              <div className={`step ${loadingPhase === 2 ? 'active' : loadingPhase > 2 ? 'completed' : 'pending'}`}>
+                {loadingPhase > 2 ? '✓' : loadingPhase === 2 ? '🔄' : '⏳'} Loading exam data
+              </div>
+              <div className={`step ${loadingPhase === 3 ? 'active' : loadingPhase > 3 ? 'completed' : 'pending'}`}>
+                {loadingPhase > 3 ? '✓' : loadingPhase === 3 ? '🔄' : '⏳'} Generating AI summary
+              </div>
+              <div className={`step ${loadingPhase === 4 ? 'active' : loadingPhase > 4 ? 'completed' : 'pending'}`}>
+                {loadingPhase > 4 ? '✓' : loadingPhase === 4 ? '🔄' : '⏳'} Extracting keywords
+              </div>
+            </div>
+            {loadingPhase === 5 ? (
+              <button 
+                className="complete-button"
+                onClick={() => setIsInitializing(false)}
+              >
+                Complete
+              </button>
+            ) : (
+              <p className="loading-note">
+                {loadingPhase === 0 && "Initializing assessment environment..."}
+                {loadingPhase === 1 && "Loading video segments..."}
+                {loadingPhase === 2 && "Loading exam data..."}
+                {loadingPhase === 3 && "Generating AI summary..."}
+                {loadingPhase === 4 && "Extracting keywords..."}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
 
       {/* Top Header */}
