@@ -193,8 +193,8 @@
 
 .patients-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
   animation: fadeIn 0.5s ease-out;
 }
 
@@ -213,14 +213,15 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 15px;
-  padding: 25px;
+  padding: 16px 20px;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   position: relative;
   overflow: hidden;
+  min-height: 80px;
 }
 
 .patient-card::before {
@@ -252,40 +253,53 @@
 }
 
 .patient-icon {
-  font-size: 40px;
+  font-size: 32px;
   background: rgba(255, 255, 255, 0.2);
   color: var(--orange-primary);
-  width: 70px;
-  height: 70px;
-  border-radius: 15px;
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.patient-info {
+.patient-selection-info {
   flex: 1;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
 }
 
-.patient-id {
+.patient-selection-id {
   font-size: 20px;
   font-weight: 600;
-  margin: 0 0 5px 0;
+  margin: 0;
   color: var(--primary-white);
+  line-height: 1.2;
 }
 
-.patient-date {
+.patient-selection-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.patient-selection-date {
   font-size: 14px;
   color: var(--text-secondary);
-  margin: 0 0 5px 0;
+  margin: 0;
+  line-height: 1.2;
 }
 
-.patient-hospital {
+.patient-selection-hospital {
   font-size: 14px;
   color: var(--lime-green-primary);
   margin: 0;
+  line-height: 1.2;
 }
 
 .patient-arrow {

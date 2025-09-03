@@ -252,9 +252,24 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
   // Simple direct access to patient data
   const comments_en = patient?.comments_en || '';
   const conclusion_en = patient?.conclusion_en || '';
-  const exam_id = patient?.exam_id;
-  const patientName = patient?.patient_name || patient?.name || 'Unknown Patient';
-  const examDate = patient?.exam_date || patient?.date || '';
+
+  console.log('🔧 [PatientDataView] comments_en:', comments_en);
+  console.log('🔧 [PatientDataView] conclusion_en:', conclusion_en);
+
+  const renderParagraphs = (text) => {
+    if (!text) return null;
+    // Split by numbered sections (1., 2., 3., etc.) - more strict pattern
+    const blocks = String(text).split(/(?=^\d+\.\s)/m);
+    return blocks.map((block, idx) => {
+      if (!block.trim()) return null;
+      return (
+        <p key={`para-${idx}`} className="notes-paragraph">
+          {block.trim()}
+        </p>
+      );
+    }).filter(Boolean);
+  };
+
 
   // Extract patient info
   const extractPatientInfo = (examId) => {
@@ -320,30 +335,21 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
 
           {/* Right side controls container */}
           <div className="right-controls-container">
-            {/* Image Quality Dropdown */}
-            <div className="dropdown-card">
-              <span className="dropdown-label">Image Quality</span>
-              <div className="dropdown-content">
-                <span className="dropdown-value">Non-Diagnostic</span>
-                <div className="dropdown-icon">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M4 6l4 4 4-4" stroke="#FFFFFF" strokeWidth="2" fill="none"/>
-                  </svg>
-                </div>
-              </div>
+            {/* Image Quality Info Box */}
+            <div className="info-box">
+              <span className="info-box-label">Image Quality</span>
+              <span className="info-box-value">
+                {'N/A'}
+              </span>
             </div>
 
-            {/* Cardiac Rhythm Dropdown */}
-            <div className="dropdown-card">
-              <span className="dropdown-label">Cardiac Rhythm</span>
-              <div className="dropdown-content">
-                <span className="dropdown-value">Ventricular Premature Beat</span>
-                <div className="dropdown-icon">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M4 6l4 4 4-4" stroke="#FFFFFF" strokeWidth="2" fill="none"/>
-                  </svg>
-                </div>
-              </div>
+            {/* Cardiac Rhythm Info Box */}
+            <div className="info-box">
+              <span className="info-box-label">Cardiac Rhythm</span>
+              <span className="info-box-value">
+              {'N/A'}
+
+              </span>
             </div>
 
             {/* End Exam Button */}
@@ -411,8 +417,8 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
             </div>
             <div className="notes-content">
               {comments_en ? (
-                <div className="notes-text">
-                  {comments_en}
+                <div className="notes-text enhanced">
+                  {renderParagraphs(comments_en)}
                 </div>
               ) : (
                 <div className="notes-text empty-state">
@@ -431,8 +437,8 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
             </div>
             <div className="notes-content">
               {conclusion_en ? (
-                <div className="notes-text">
-                  {conclusion_en}
+                <div className="notes-text enhanced">
+                  {renderParagraphs(conclusion_en)}
                 </div>
               ) : (
                 <div className="notes-text empty-state">

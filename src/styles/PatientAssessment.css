@@ -7,7 +7,7 @@
   color: var(--text-primary);
   display: grid;
   grid-template-columns: 60px 1fr;
-  grid-template-rows: 44px auto 1fr 50px;
+  grid-template-rows: 44px auto 1fr 60px;
   grid-template-areas: 
     "header header"
     "sidebar patient-info"
@@ -220,7 +220,7 @@
 /* Footer */
 .footer {
   grid-area: footer;
-  height: 50px;
+  height: 60px;
   background-color: #1D212B;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   contain: layout;
@@ -232,7 +232,6 @@
   align-items: center;
   height: 100%;
   padding: 0 30px;
-  margin-left: 60px; /* Account for sidebar */
   min-height: 60px; /* Ensure minimum height for buttons */
 }
 
@@ -260,10 +259,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  transform: none !important;
+  transition: none !important;
 }
 
 .footer .back-button:active {
-  transform: translateX(0);
+  transform: none !important; /* remove movement */
+  box-shadow: none !important;
 }
 
 .final-report-button {
@@ -493,6 +495,8 @@
   align-items: center;
   padding: 14px 20px;
   contain: layout;
+  position: relative;
+  z-index: 9997;
 }
 
 .patient-info-row {
@@ -555,6 +559,8 @@
   padding-left: 0px;
   padding-right: 0px;
   min-width: 0; /* flex item이 축소될 수 있도록 */
+  position: relative;
+  z-index: 9997;
 }
 
 /* Dropdown Cards */
@@ -570,6 +576,7 @@
   flex: 1 1 0;
   min-width: 0;
   margin-left: 0;
+  z-index: 9998;
 }
 
 .dropdown-card:first-of-type {
@@ -611,6 +618,65 @@
   position: relative;
   width: 16px;
   height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-icon.open {
+  transform: rotate(180deg);
+}
+
+.dropdown-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #000000; /* nearly black dropdown */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  margin-top: 6px;
+  z-index: 9999;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+
+.dropdown-option {
+  padding: 12px 16px;
+  color: #FFFFFF; /* white text */
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  border-radius: 8px;
+  background: #000000; /* default: black */
+  position: relative;
+  padding-right: 16px; /* normal right padding */
+}
+
+.dropdown-option:hover {
+  background: #0B0D10; /* dark hover */
+  color: #FFFFFF;
+}
+
+.dropdown-option.selected {
+  background: #232528; /* selected: dark */
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+/* Right chevron for options */
+.dropdown-option::after {
+  content: none; /* remove arrow in dropdown options */
+}
+
+.dropdown-option:hover::after,
+.dropdown-option.selected::after { content: none; }
+
+.dropdown-option:first-child {
+  border-radius: 8px 8px 0 0;
+}
+
+.dropdown-option:last-child {
+  border-radius: 0 0 8px 8px;
 }
 
 /* Final Report Button */
@@ -679,6 +745,7 @@
   padding: 10px 20px 15px 20px;
   contain: layout style; /* Optimize layout calculations */
   transform: translateZ(0); /* GPU acceleration */
+  z-index: 1;
 }
 
 /* Video Panel - Transform-Based Positioning for GPU Acceleration */
@@ -1629,7 +1696,7 @@
   overflow: hidden;
 }
 
-.back-button {
+.edit-header .back-button {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
@@ -1780,7 +1847,6 @@
 
 .edit-body-full {
   flex: 1;
-  padding: 0px 25px;
   overflow-y: auto;
   background: #000000;
 }
@@ -1853,20 +1919,72 @@
 
 .field-select {
   width: 100%;
-  padding: 5px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  padding: 8px 36px 8px 12px; /* space for custom caret */
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
   color: var(--text-primary);
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #bfbfbf 50%),
+    linear-gradient(135deg, #bfbfbf 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 3px),
+    calc(100% - 14px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+/* Feature field specific select styling (more modern, prominent) */
+.feature-field .field-select {
+  background: #0F1218;
+  border: 1px solid #00d4aa;
+  border-radius: 16px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 36px 8px 12px; /* extra room for caret */
+  box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.25);
+}
+
+.feature-field .field-select:hover {
+  background: #121722;
+  border-color: #12e3bf;
+}
+
+.feature-field .field-select:focus {
+  outline: none;
+  background: #121722;
+  border-color: #12e3bf;
+  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.25);
+}
+
+.feature-field .field-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.feature-field .field-select option {
+  background: #000000;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.field-select:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .field-select:focus {
   outline: none;
   border-color: var(--accent-primary);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.25);
 }
 
 /* Select dropdown options styling */
@@ -1875,6 +1993,13 @@
   color: #ffffff;
   padding: 8px 12px;
 }
+
+.field-select option:checked {
+  background: #0B0D10;
+}
+
+/* Hide default arrow in IE */
+.field-select::-ms-expand { display: none; }
 
 .field-select option:hover {
   background: rgba(255, 255, 255, 0.1);
@@ -3366,7 +3491,7 @@
 
 .recommend-feature-item {
   background: #1D212B;
-  padding: 10px 25px;
+  padding: 10px 10px;
   border-radius: 0px;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
   transition: all 0.3s ease;
@@ -3379,12 +3504,12 @@
 .recommend-feature-item:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(249, 168, 37, 0.3);
-  transform: translateX(5px);
+  transform: none; /* remove movement */
 }
 
 .feature-row {
   display: flex;
-  align-items: center;
+  align-items: center; /* vertically center category + name + control */
   justify-content: space-between;
   margin-bottom: 0;
   padding: 0;
@@ -3397,23 +3522,107 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal; /* allow wrapping */
+  word-break: break-word; /* wrap long tokens */
+  line-height: 1.4;
+}
+
+.feature-category-cell {
+  flex: 0 0 auto;
+  min-width: 130px; /* fixed space so name never overlaps */
+}
+
+.feature-category-label {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.feature-sep {
+  margin-right: 8px;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 
 
 .feature-field {
   flex: 0 0 auto;
-  width: 200px;
-  min-width: 200px;
-  max-width: 200px;
+  width: 150px;
   position: relative;
   display: flex;
   align-items: center;
+}
+.feature-dd { position: relative; width: 100%; }
+.feature-dd .field-select { width: 100%; text-align: left; }
+
+/* Add dropdown caret to feature-dd trigger */
+.feature-dd .field-select {
+  position: relative;
+  padding-right: 36px; /* space for caret */
+}
+.feature-dd .field-select::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 12px 12px;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3e%3cpath d='M6 9l6 6 6-6' stroke='%23BFBFBF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+  opacity: 0.9;
+}
+.feature-dd .field-select[aria-expanded="true"]::after {
+  transform: translateY(-50%) rotate(180deg);
+}
+.feature-dd .dropdown-options { width: 100%; }
+
+/* Portal dropdown: ensure on top and soft edges; support opening upward */
+.feature-dd-portal {
+  border-radius: 18px;
+  padding: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  box-shadow: 0 16px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08) inset;
+}
+
+.feature-dd-portal.top {
+  transform-origin: bottom;
+}
+
+.feature-dd-portal.bottom {
+  transform-origin: top;
+}
+
+/* Right-side dropdown caret for feature field selects */
+.feature-field::after { content: none; }
+
+.feature-field:has(select)::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 12px 12px;
+  /* Chevron-down icon (white/gray) */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3e%3cpath d='M6 9l6 6 6-6' stroke='%23BFBFBF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+  opacity: 0.9;
 }
 
 .feature-field input:not([type="checkbox"]),
@@ -3496,7 +3705,7 @@
 /* AI Chatbot Section - Flexbox for proper expansion */
 .chatbot-section {
   position: relative;
-  flex: 0 0 56px; /* Fixed height for minimized state */
+  flex: 0 0 56px !important; /* Fixed height for minimized state - Force override */
   background: #1D212B;
   border-radius: 35px;
   display: flex;
@@ -3525,13 +3734,13 @@
 
 /* Chat Expanded Mode - Fixed 2:1 ratio */
 .summary-panel.chat-active .chatbot-section {
-  flex: 0 0 66.67%; /* 2/3 height (2 parts) */
+  flex: 0 0 66.67% !important; /* 2/3 height (2 parts) - Force override */
   background: linear-gradient(to top, #1A1D24 0%, #1F232D 100%);
   border-radius: 5px;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
   will-change: flex;
   min-height: 150px; /* Minimum chat height */
-  max-height: calc(66.67%); /* Constrain height to prevent overflow */
+  max-height: 66.67%; /* Constrain height to prevent overflow */
   overflow: hidden;
   /* Ensure chatbot-section stays within summary-panel bounds */
   max-width: 100%;
@@ -3554,7 +3763,7 @@
 
 /* Summary Section - Flexbox control */
 .summary-section {
-  flex: 1; /* Take remaining space instead of fixed percentage */
+  flex: 1 !important; /* Take remaining space instead of fixed percentage - Force override */
   position: relative;
   display: flex;
   flex-direction: column;
@@ -3584,7 +3793,7 @@
 /* Summary section collapse during chat activation */
 /* Summary section collapse during chat activation - Fixed 1:2 ratio */
 .summary-panel.chat-active .summary-section {
-  flex: 0 0 33.33%; /* 1/3 height (1 part) */
+  flex: 0 0 33.33% !important; /* 1/3 height (1 part) - Force override */
   min-height: 50px; /* Minimum height */
   max-height: calc(33.33% - 20px); /* Constrain height to prevent overflow */
   overflow: hidden;
@@ -4121,13 +4330,23 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 0 20px 20px;
+  padding: 0 0px 20px;
 }
 
 .message-item {
   display: flex;
   gap: 12px;
   animation: slideInMessage 0.3s ease-out;
+}
+
+.user-message {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+
+.assistant-message {
+  flex-direction: row;
+  justify-content: flex-start;
 }
 
 @keyframes slideInMessage {
@@ -4184,16 +4403,31 @@
 
 .user-message .message-text {
   background: rgba(102, 126, 234, 0.2);
+  margin-left: auto;
+  max-width: 90%;
 }
 
 .assistant-message .message-text {
   background: rgba(255, 255, 255, 0.1);
+  margin-right: auto;
+  max-width: 90%;
 }
 
 .message-timestamp {
   font-size: 11px;
   color: #999;
   margin-top: 4px;
+  padding-left: 16px;
+}
+
+.user-message .message-timestamp {
+  text-align: right;
+  padding-right: 16px;
+  padding-left: 0;
+}
+
+.assistant-message .message-timestamp {
+  text-align: left;
   padding-left: 16px;
 }
 

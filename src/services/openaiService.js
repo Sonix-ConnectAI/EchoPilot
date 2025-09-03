@@ -720,7 +720,7 @@ pericardial_disease: effusion_amount, pericardial_thickening_or_adhesion, hemody
 cardiomyopathy: cardiomyopathy_type, hypertrophic_type
 intracardiac_findings: ASD, PFO, VSD, PDA, intracardiac_device, LVOT obstruction, RVOT obstruction, mid-cavity obstruction, mass_presence
 
-## 사용 가능한 측정값 필드 (key_measure_feature용)
+## 사용 가능한 카테고리 별 측정값 필드 (key_measure_feature_by_category용)
 lv_geometry: IVSd, LVEDD, LVPWd, IVSs, LVESD, LVPWs, rwt, LV Mass, LVOT diameter
 lv_systolic_function: lvef, gls, LV EDV, LV ESV
 lv_diastolic_function: E-wave Velocity, A-wave Velocity, E/A ratio, DT, IVRT, S', E', A', E/E'
@@ -738,10 +738,15 @@ pulmonary_vessels: rvsp
     {
       "text": "키워드명",
       "sentence_number": 키워드가 추출된 문장 번호 (문장의 제일 앞에 있는 번호, 예: "1.", "2.", "3." 등 - 반드시 숫자로 입력)
-      "category": ["카테고리1", "카테고리2", ...],
       "importance": 1-5,
-      "key_feature": ["필드1", "필드2", "필드3", "필드4", "필드5", ... (각 키워드당 최소 5개 이상 - 필수)]
-      "key_measure_feature": ["측정값필드1", "측정값필드2", "측정값필드3", ... (각 키워드당 최소 3개 이상 - 필수)]
+      "key_feature_by_category": {
+        "카테고리1": ["필드1", "필드2", "필드3", "필드4", "필드5"],
+        "카테고리2": ["필드1", "필드2", "필드3", "필드4", "필드5"]
+      },
+      "key_measure_feature_by_category": {
+        "카테고리1": ["측정값필드1", "측정값필드2", "측정값필드3"],
+        "카테고리2": ["측정값필드1", "측정값필드2", "측정값필드3"]
+      }
     }
   ]
 }
@@ -1010,11 +1015,30 @@ export const extractKeywordsFromSummary = async (summaryText, structPred = {}, e
         if (!jsonStr) throw _;
         parsed = JSON.parse(jsonStr);
       }
-      // keep key_feature entries as provided (no underscore conversion)
-      const passthrough = (parsed.keywords || []).map(k => ({
-        ...k,
-        key_feature: Array.isArray(k.key_feature) ? k.key_feature : []
-      }));
+      // Normalize new grouped structure to legacy arrays for UI compatibility
+      const flattenByCategory = (obj) => {
+        if (!obj || typeof obj !== 'object') return [];
+        const out = [];
+        Object.keys(obj).forEach(cat => {
+          const arr = Array.isArray(obj[cat]) ? obj[cat] : [];
+          arr.forEach(v => out.push(v));
+        });
+        return out;
+      };
+
+      const passthrough = (parsed.keywords || []).map(k => {
+        const keyFeatureByCat = k.key_feature_by_category || {};
+        const keyMeasureByCat = k.key_measure_feature_by_category || {};
+        const flatFeatures = Array.isArray(k.key_feature) ? k.key_feature : flattenByCategory(keyFeatureByCat);
+        const flatMeasures = Array.isArray(k.key_measure_feature) ? k.key_measure_feature : flattenByCategory(keyMeasureByCat);
+        return {
+          ...k,
+          key_feature_by_category: keyFeatureByCat,
+          key_measure_feature_by_category: keyMeasureByCat,
+          key_feature: flatFeatures,
+          key_measure_feature: flatMeasures
+        };
+      });
       return { keywords: passthrough, suggestions: parsed.suggestions || [], warnings: parsed.warnings || [] };
     } catch (e) {
       if (options && options.debug) {

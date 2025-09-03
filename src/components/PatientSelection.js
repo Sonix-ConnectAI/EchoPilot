@@ -13,6 +13,12 @@ const PatientSelection = ({ onPatientSelect }) => {
 
   useEffect(() => {
     loadPatientData();
+    
+    // Cleanup function to reset states when component unmounts
+    return () => {
+      setIsSubmitting(false);
+      setSubmitError(null);
+    };
   }, []);
 
   const loadPatientData = async () => {
@@ -95,7 +101,9 @@ const PatientSelection = ({ onPatientSelect }) => {
           ...patient,
           struct_pred: data.struct_pred
         };
-        // Immediately call onPatientSelect to show processing overlay
+        // Reset submitting state before navigation to prevent spinner flash
+        setIsSubmitting(false);
+        // Call onPatientSelect to navigate to next page
         onPatientSelect(enrichedPatient);
       } else {
         throw new Error(data.error || 'Failed to generate structured prediction');
@@ -103,9 +111,8 @@ const PatientSelection = ({ onPatientSelect }) => {
     } catch (err) {
       console.error('❌ Error generating struct_pred:', err);
       setSubmitError(err.message || 'Failed to connect to backend');
-      setIsSubmitting(false); // Only reset if there's an error
+      setIsSubmitting(false); // Reset on error
     }
-    // Don't reset isSubmitting here - let the processing overlay handle it
   };
 
   return (
@@ -132,7 +139,7 @@ const PatientSelection = ({ onPatientSelect }) => {
       </div>
 
       <div className="content">
-        {isLoading && (
+        {isLoading && !isSubmitting && (
           <div className="loading-container">
             <div className="loading-spinner"></div>
             <p className="loading-text">Loading patient database...</p>
@@ -196,14 +203,14 @@ const PatientSelection = ({ onPatientSelect }) => {
                     onMouseLeave={() => setHoveredPatient(null)}
                   >
                     <div className="patient-icon">👤</div>
-                    <div className="patient-info">
-                      <h3 className="patient-id">{patientInfo.id}</h3>
-                      {patientInfo.date && (
-                        <p className="patient-date">{patientInfo.date}</p>
-                      )}
-                      {patient.hospital && (
-                        <p className="patient-hospital">{patient.hospital}</p>
-                      )}
+                    <div className="patient-selection-info">
+                      <h3 className="patient-selection-id">{patientInfo.id}</h3>
+                      <div className="patient-selection-details">
+                        <p className="patient-selection-date">{patientInfo.date || 'No date'}</p>
+                        {patient.hospital && (
+                          <p className="patient-selection-hospital">{patient.hospital}</p>
+                        )}
+                      </div>
                     </div>
                     <div className="patient-arrow">→</div>
                   </div>

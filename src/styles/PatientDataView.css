@@ -73,7 +73,7 @@
 }
 
 .loading-steps .step {
-  padding: 12px 0;
+  padding: 12px 10px;
   font-size: 16px;
   color: #CCCCCC;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -263,7 +263,7 @@
 
 .videos-area .section-header {
   padding: 20px 25px 15px;
-  background: #1D212B;
+  background: #000000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
@@ -292,7 +292,7 @@
   overflow-y: auto;
   padding: 5px;
   min-height: 0;
-  background: #1D212B;
+  background: #000000;
 }
 
 /* Videos Loading State */
@@ -375,7 +375,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #1A1D24;
+  background: #000000;
   border-radius: 8px;
   max-width: 100%;
   max-height: 100%;
@@ -492,6 +492,26 @@
   word-wrap: break-word;
 }
 
+/* Enhanced typography for comments/conclusion */
+.notes-text.enhanced {
+  color: #D5D7DB; /* slightly brighter for readability */
+  line-height: 1.75;
+  font-size: 15px;
+  letter-spacing: 0.1px;
+}
+
+.notes-paragraph {
+  margin: 0 0 12px 0;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.notes-paragraph:last-child {
+  margin-bottom: 0;
+}
+
 /* Empty state */
 .notes-text:empty::before {
   content: 'No data available';
@@ -525,13 +545,16 @@
 
 /* Page Footer */
 .page-footer {
-  padding: 10px 30px;
+  padding: 0 30px;
   background: #1D212B;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
+  height: 60px; /* Match Assessment footer height */
+  min-height: 60px; /* Ensure minimum height for buttons */
+  box-sizing: border-box;
 }
 
 .page-footer .back-button {
@@ -545,11 +568,10 @@
 .page-footer .back-button:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.3);
-  transform: translateX(-2px);
 }
 
 .page-footer .back-button:active {
-  transform: translateX(0);
+  transform: none;
 }
 
 .page-footer .continue-button {
@@ -558,29 +580,28 @@
 }
 
 .continue-button {
-  background: #000000;
-  color: #ffffff;
+  background: linear-gradient(135deg, #00d4aa 0%, #00a585 100%);
+  color: #000000;
   border: none;
   padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  height: 44px; /* Comfortable touch target inside 60px footer */
+  box-shadow: 0 2px 8px rgba(0, 212, 170, 0.25);
 }
 
 .continue-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-  background: #000000;
+  box-shadow: 0 4px 14px rgba(0, 212, 170, 0.35);
 }
 
 .continue-button:active {
-  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 212, 170, 0.25);
 }
 
 .continue-button:disabled {
@@ -752,4 +773,139 @@
 .video-card:focus-within {
   outline: 2px solid #00B4D8;
   outline-offset: 2px;
+}
+
+/* Patient Information Panel */
+.patient-info-container {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px;
+  contain: layout;
+  position: relative;
+  z-index: 9997;
+}
+
+.patient-info-row {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  width: 100%;
+  justify-content: flex-start;
+  flex-grow: 1;
+}
+
+.patient-info-card {
+  background-color: #1D212B;
+  border-radius: 16px;
+  padding: 20px 40px;
+  display: flex;
+  gap: 60px;
+  align-items: center;
+  height: 60px;
+  flex: 0 0 80%; /* 70%에서 80%로 증가 */
+  min-width: 500px; /* 400px에서 500px로 증가 */
+}
+
+.patient-info-item {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.info-label {
+  opacity: 0.5;
+  font-weight: 500;
+  color: var(--text-white, #ffffff);
+}
+
+.info-value {
+  opacity: 0.9;
+  font-size: 16px;
+  color: var(--text-white, #ffffff);
+}
+
+.info-value-bold {
+  opacity: 0.9;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-white, #ffffff);
+}
+
+/* Right Controls Container */
+.right-controls-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex: 1 1 20%; /* container width stays same */
+  justify-content: space-between;
+  width: 100%;
+  padding-left: 0px;
+  padding-right: 0px;
+  min-width: 0;
+  position: relative;
+  z-index: 9997;
+}
+
+/* Info Boxes */
+.info-box {
+  background-color: #1D212B;
+  border-radius: 12px;
+  padding: 3px 20px; /* 16px에서 20px로 증가 */
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 200px; /* allow equal flexing */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-box-label {
+  font-size: 12px;
+  color: #A0A0A0;
+  font-weight: 500;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.info-box-value {
+  font-size: 18px; /* 14px에서 18px로 증가 */
+  color: #ffffff;
+  font-weight: 700; /* 600에서 700으로 증가 (더 볼드하게) */
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* prevent spillover */
+}
+
+/* End Exam Button */
+.end-exam-button {
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px; /* 20px에서 16px로 감소 */
+  font-size: 13px; /* 14px에서 13px로 감소 */
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0; /* allow equal flexing */
+  flex: 1 1 0; /* equal width with info-box */
+}
+
+.end-exam-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);
+}
+
+.end-exam-button:active {
+  transform: translateY(0);
 }
