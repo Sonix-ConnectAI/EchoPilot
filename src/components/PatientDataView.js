@@ -253,21 +253,15 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
   const comments_en = patient?.comments_en || '';
   const conclusion_en = patient?.conclusion_en || '';
 
-  console.log('🔧 [PatientDataView] comments_en:', comments_en);
-  console.log('🔧 [PatientDataView] conclusion_en:', conclusion_en);
-
   const renderParagraphs = (text) => {
     if (!text) return null;
     // Split by numbered sections (1., 2., 3., etc.) - more strict pattern
     const blocks = String(text).split(/(?=^\d+\.\s)/m);
-    return blocks.map((block, idx) => {
-      if (!block.trim()) return null;
-      return (
-        <p key={`para-${idx}`} className="notes-paragraph">
-          {block.trim()}
-        </p>
-      );
-    }).filter(Boolean);
+    return (
+      <p className="notes-paragraph">
+        {blocks.join(' ').trim()}
+      </p>
+    );
   };
 
 
@@ -410,30 +404,10 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
         {/* Clinical Notes Area - Right 50% */}
         <div className="clinical-notes-area">
           
-          {/* Comments Section - Top 50% */}
-          <div className="notes-section comments-section">
-            <div className="section-header">
-              <h2>Clinical Comments</h2>
-            </div>
-            <div className="notes-content">
-              {comments_en ? (
-                <div className="notes-text enhanced">
-                  {renderParagraphs(comments_en)}
-                </div>
-              ) : (
-                <div className="notes-text empty-state">
-                  <div className="empty-icon">💬</div>
-                  <p>No clinical comments available.</p>
-                  <p className="empty-subtitle">Clinical observations and notes will appear here.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Conclusion Section - Bottom 50% */}
           <div className="notes-section conclusion-section">
             <div className="section-header">
-              <h2>Clinical Conclusion</h2>
+              <h2>Physician’s Summary</h2>
             </div>
             <div className="notes-content">
               {conclusion_en ? (
@@ -450,6 +424,25 @@ const PatientDataView = ({ patient, onContinueToAssessment, onBack }) => {
             </div>
           </div>
 
+          {/* Comments Section - Top 50% */}
+          <div className="notes-section comments-section">
+            <div className="section-header">
+              <h2>Physician’s Conclusion</h2>
+            </div>
+            <div className="notes-content">
+              {comments_en ? (
+                <div className="notes-text enhanced">
+                  {renderParagraphs(comments_en)}
+                </div>
+              ) : (
+                <div className="notes-text empty-state">
+                  <div className="empty-icon">💬</div>
+                  <p>No clinical comments available.</p>
+                  <p className="empty-subtitle">Clinical observations and notes will appear here.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

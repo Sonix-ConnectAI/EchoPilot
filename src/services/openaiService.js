@@ -206,39 +206,6 @@ const SUMMARY_SYS_PROMPT = `
 (필요한만큼 추가)
 `;
 
-const CONCLUSION_SYS_PROMPT = `
-역할: 당신은 경험 많은 심장내과 전문의로서 심초음파(echocardiography) 검사 결과를 바탕으로 구조화된 심초음파 소견(Conclusion)을 작성합니다.
-작성 지침: Conclusion은 번호를 매긴 리스트 형태로 작성합니다. 핵심 이상 소견만 간결히 정리합니다. 전체적으로 간결하고 명료한 표현을 사용합니다. 긴 문장은 피하세요. 작성은 영어로 합니다.
-병태생리적 원인과 결과 관계를 명확하다면 그걸 포함하여 글을 간결히 작성하세요(e.g., "~로 인한", "~관련된").
-중요 수치는 반드시 괄호 안에 단위를 포함하여 표기합니다.
-
-아래 형식을 정확히 따라주세요 (예시 제공):
-Conclusion:
-1. Finding A (중요 수치 포함) 관련된 원인 설명
-2. Finding B (중요 수치 포함) 로 인한 결과 설명
-...
-`;
-
-const RECOMMENDATION_SYS_PROMPT = `
-제공할 데이터:
-
-심초음파 검사 결과 (표로 제공)
-
-작성 지침:
-
-Clinical Recommendation이라는 제목으로 시작합니다.
-
-간결하면서도 동료 의사가 쉽게 이해할 수 있는 문장으로 작성합니다.
-
-권고사항을 명확히 기술하고, 그 근거로 제공된 데이터를 명시적으로 참조하여 뒷받침합니다.
-
-치료적 결정에 영향을 미치는 중요한 임상적 소견(e.g., 환자의 subjective symptoms 및 echocardiographic findings)을 모두 포함합니다.
-
-최종 권고사항을 명확히 기술하고 근거를 요약적으로 제시합니다.
-
-영어로 작성하며, 명료하고 간결한 문장을 사용합니다.
-`;
-
 
 // Combined function to generate all three reports
 export const generateAIReport = async (patientData, options = {}) => {
@@ -273,7 +240,13 @@ export const generateAIReport = async (patientData, options = {}) => {
 const generateAIReportHTTP = async (patientData, options = {}) => {
   const structured = structurePatientData(patientData) || {};
   const userContent = JSON.stringify(structured, null, 2);
+  
+  console.log("📝 [Summary] Prompt:");
+  console.log('    ', SUMMARY_SYS_PROMPT);
 
+  console.log("📝 [Summary] Input userContent:");
+  console.log('    ', userContent);
+  
   const summary = await callOpenAI(SUMMARY_SYS_PROMPT, userContent, { max_tokens: 3000, temperature: 0.2, ...options });
 
     return {
@@ -631,8 +604,13 @@ export const structurePatientData = (patientData) => {
 
 // Thin wrappers to keep backward compatibility
 export const generateSummary = async (patientData, options = {}) => {
+  
   const useWebSocket = false;
   const report = await generateAIReport(patientData, { useWebSocket, ...options });
+  
+  console.log('📝 [Summary] Generated summary:');
+  console.log('    ', report.summary || '');
+  
   return report.summary || '';
 };
 
@@ -939,30 +917,26 @@ export const generateSummaryFromStructuredData = async (structuredData, options 
     
     const GENERATE_SUMMARY_PROMPT = `
 역할: 당신은 경험 많은 심장내과 전문의로서 심초음파(echocardiography) 검사 결과를 바탕으로 구조화된 심초음파 소견(Summary)을 작성합니다.
-
-작성 지침: 
-- Summary는 번호를 매긴 리스트 형태로 작성합니다
-- 병태생리적 원인과 결과 관계를 명확히 나타내세요(e.g., "~로 인한", "~관련된")
-- 중요 수치(예: LVOT 속도, RVSP, 대동맥 크기, ERO 등)는 반드시 괄호 안에 단위를 포함하여 표기합니다
-- 전체적으로 간결하고 명료한 표현을 사용합니다
-- 긴 문장은 피하세요
-- 작성은 영어로 합니다
+작성 지침: Summary는 번호를 매긴 리스트 형태로 작성합니다. Summary에서는 병태생리적 원인과 결과 관계를 명확히 나타내세요(e.g., "~로 인한", "~관련된").
+중요 수치(예: LVOT 속도, RVSP, 대동맥 크기, ERO 등)는 반드시 괄호 안에 단위를 포함하여 표기합니다.
+전체적으로 간결하고 명료한 표현을 사용합니다. 긴 문장은 피하세요. 작성은 영어로 합니다.
 
 예외 규칙:
-환자가 sinus rhythm이 아닌 경우 (e.g., atrial fibrillation, atrial_flutter, ventricular_premature_beat, atrial_premature_beat, paced_rhythm, other 등)에는 diastolic dysfunction grade를 기재하지 않습니다. 대신 "Diastolic function assessment is limited due to [rhythm type]"라고 표기합니다.
-
-아래 형식을 정확히 따라주세요:
-1. LV size and geometry
+환자가 sinus rhythm이 **아닌 경우** (e.g., atrial fibrillation, atrial_flutter, ventricular_premature_beat, atrial_premature_beat, paced_rhythm, other 등)에는 **diastolic dysfunction grade를 기재하지 않습니다.** 대신 Diastolic function assessment is limited due to ~~. 라고 표기합니다.
+ 
+아래 형식을 정확히 따라주세요 (예시 제공):
+1. LV size와 geometry
 2. LV function (systolic/diastolic)
-3. Valve function
+3. valve function
 4. RV function
-5. Atria
-6. Extracardiac findings (effusion, IVC, pericardial, etc)
+5. Atira
+6. extracardiac (effusion,ivc, pericardial, etc)
+7. ~~
+...
 (필요한만큼 추가)
-
-입력된 structuredData를 분석하여 의미있는 소견들을 위 형식에 맞춰 작성하세요.
 `;
-    
+    console.log('🔍 structuredData:', structuredData);
+    console.log('🔍 Prompt:', GENERATE_SUMMARY_PROMPT);
     const userContent = JSON.stringify(structuredData, null, 2);
     
     const response = await callOpenAI(
@@ -976,7 +950,6 @@ export const generateSummaryFromStructuredData = async (structuredData, options 
       }
     );
     
-    console.log('✅ Summary generated successfully from structuredData');
     return response;
     
   } catch (error) {
@@ -987,7 +960,15 @@ export const generateSummaryFromStructuredData = async (structuredData, options 
 
 export const extractKeywordsFromSummary = async (summaryText, structPred = {}, examId = null, options = {}) => {
   try {
+    console.log('🔑 [Keywords] Prompt: Extract clinical keywords from echocardiography summary');
+    
     const userPayload = JSON.stringify({ summary: summaryText, struct_pred: structPred, exam_id: examId });
+    
+    console.log('🔑 [Keywords] Input Prompt:');
+    console.log('    ', KEYWORD_SYS_PROMPT_KO_V6);
+    console.log('🔑 [Keywords] Input Data:');
+    console.log('    ', userPayload);
+
     const response = await callOpenAI(KEYWORD_SYS_PROMPT_KO_V6, userPayload, { max_tokens: 5000, temperature: 0.0, ...options });
     try {
       // Robust parsing: accept raw JSON, fenced code blocks, or loose text with JSON inside

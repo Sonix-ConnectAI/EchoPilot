@@ -113,8 +113,7 @@ export const npzToStreamUrl = (npzPath, options = {}) => {
 // Enhanced npzToVideoUrl with multiple methods support
 export const npzToVideoUrl = async (videoPath, method = 'frames', options = {}) => {
   try {
-    console.log('🎬 Getting video URL for:', videoPath, 'method:', method);
-    
+
     // If it's already an MP4 path, return directly
     if (videoPath.endsWith('.mp4')) {
       return videoPath;

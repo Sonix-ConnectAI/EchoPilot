@@ -74,7 +74,7 @@ const PatientSelection = ({ onPatientSelect }) => {
     setSubmitError(null);
     
     try {
-      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+      const BACKEND_URL = process.env.REACT_APP_PYTHON_BACKEND_URL || 'http://localhost:5000';
       const DB_JSON_PATH = process.env.REACT_APP_DB_JSON_PATH;
       
       const payload = {

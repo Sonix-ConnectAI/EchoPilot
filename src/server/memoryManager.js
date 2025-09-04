@@ -190,7 +190,7 @@ class MemoryManager {
   selectModel(complexity, tokenCount) {
     // Simple queries -> cheaper model
     if (complexity === 'simple' && tokenCount < 1000) {
-      return 'gpt-3.5-turbo';
+      return 'gpt-4.1-2025-04-14';
     }
     
     // Complex queries -> better model

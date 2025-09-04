@@ -254,82 +254,82 @@ const standardizedStructure_measure = {
   }
 };
 
-// Build structured data from flat patientData using standardizedStructure
-function buildStructuredFromPatientData(source) {
-  if (!source) return null;
-  const result = {};
-  Object.entries(standardizedStructure).forEach(([category, spec]) => {
-    if (Array.isArray(spec)) {
-      // top-level classification category uses category key itself
-      const val = source[category];
-      if (val !== undefined && val !== null && val !== '') {
-        result[category] = val;
-      }
-    } else if (spec && typeof spec === 'object') {
-      const nested = {};
-      Object.keys(spec).forEach((field) => {
-        const v = source[field] !== undefined ? source[field] : source[`${category}//${field}`];
-        if (v !== undefined && v !== null && v !== '') {
-          nested[field] = v;
-        }
-      });
-      if (Object.keys(nested).length > 0) {
-        result[category] = nested;
-      }
-    }
-  });
-  return result;
-}
-
 // DetailEditor Component for editing patient data - Memoized for performance
-const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, imageQuality, setImageQuality, cardiacRhythm, setCardiacRhythm, originalImageQuality, setOriginalImageQuality, originalCardiacRhythm, setOriginalCardiacRhythm }) => {
+const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, externalEdit, onEditedDataChange }) => {
   const [editedStructuredData, setEditedStructuredData] = useState(structuredData || {});
   const [originalStructuredData, setOriginalStructuredData] = useState(structuredData || {});
   const [hasChanges, setHasChanges] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const lastExternalEditRef = useRef(null);
   
   // Keep local state in sync when parent provides/updates structuredData
   useEffect(() => {
     setEditedStructuredData(structuredData || {});
     setOriginalStructuredData(structuredData || {});
     
-    // Set original dropdown values from patient data when DetailEditor initializes
-    if (patientData) {
-      if (patientData.image_quality) {
-        setOriginalImageQuality(patientData.image_quality);
-      }
-      if (patientData.cardiac_rhythm) {
-        setOriginalCardiacRhythm(patientData.cardiac_rhythm);
-      }
-    }
+
     
     setHasChanges(false);
   }, [structuredData, patientData]);
 
-  // Check if there are changes (including dropdown changes)
+        // Check if there are changes (including dropdown changes)
   useEffect(() => {
     const hasModifications = JSON.stringify(editedStructuredData) !== JSON.stringify(originalStructuredData);
-    const hasDropdownChanges = imageQuality !== originalImageQuality || cardiacRhythm !== originalCardiacRhythm;
-    
-    // Log changes detection for debugging
-    if (hasDropdownChanges) {
-      console.log('🔧 [DetailEditor] Dropdown changes detected:');
-      console.log('  - imageQuality:', imageQuality, 'vs original:', originalImageQuality);
-      console.log('  - cardiacRhythm:', cardiacRhythm, 'vs original:', originalCardiacRhythm);
+    setHasChanges(hasModifications);
+  }, [editedStructuredData, originalStructuredData]);
+
+  // Sync editedStructuredData when structuredData changes (e.g., from dropdown)
+  useEffect(() => {
+    if (structuredData && !hasChanges) {
+      // Only sync if there are no pending changes
+      setEditedStructuredData(structuredData);
+      setOriginalStructuredData(structuredData);
     }
-    
-    setHasChanges(hasModifications || hasDropdownChanges);
-  }, [editedStructuredData, originalStructuredData, imageQuality, originalImageQuality, cardiacRhythm, originalCardiacRhythm]);
+  }, [structuredData, hasChanges]);
+
+  // Apply external edit from parent (top-bar dropdown bridge)
+  useEffect(() => {
+    if (!externalEdit || !externalEdit.category || !externalEdit.field) return;
+    const key = JSON.stringify(externalEdit);
+    if (lastExternalEditRef.current === key) return; // prevent re-applying same edit
+
+    const { category, field, value } = externalEdit;
+    const current = (editedStructuredData?.[category] || {})[field];
+    if (current !== value) {
+      handleFieldChange(category, field, value);
+    }
+    lastExternalEditRef.current = key;
+  }, [externalEdit, editedStructuredData]);
+
+  // Notify parent component when editedStructuredData changes
+  useEffect(() => {
+    if (onEditedDataChange) {
+      onEditedDataChange(editedStructuredData);
+    }
+  }, [editedStructuredData, onEditedDataChange]);
 
   // Handle field changes
   const handleFieldChange = (category, field, value) => {
-    setEditedStructuredData(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [field]: value
-      }
-    }));
+    // image_quality와 cardiac_rhythm도 중첩된 구조로 저장하되, 안전하게 처리
+    if (category === 'image_quality' || category === 'cardiac_rhythm') {
+      setEditedStructuredData(prev => ({
+        ...prev,
+        [category]: {
+          ...(prev[category] || {}),  // prev[category]가 없으면 빈 객체로 초기화
+          [field]: value
+        }
+      }));
+    } else {
+      // 기존 로직 (중첩된 필드)
+      setEditedStructuredData(prev => ({
+        ...prev,
+        [category]: {
+          ...(prev[category] || {}),  // 안전하게 처리
+          [field]: value
+        }
+      }));
+    }
+    setHasChanges(true);
   };
 
   // Handle numeric field changes
@@ -340,43 +340,56 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
 
   // Apply changes with summary regeneration
   const handleApply = async () => {
-    // Save dropdown changes to original values
-    setOriginalImageQuality(imageQuality);
-    setOriginalCardiacRhythm(cardiacRhythm);
-    
-    // Create final data with dropdown values included
+    // Create final data (dropdown values are already in editedStructuredData)
     const finalData = {
-      ...editedStructuredData,
-      image_quality: imageQuality,
-      cardiac_rhythm: cardiacRhythm
+      ...editedStructuredData
     };
-    
-    // Log dropdown changes for debugging
-    console.log('🔧 [DetailEditor] Apply clicked - Dropdown values:');
-    console.log('  - imageQuality:', imageQuality);
-    console.log('  - cardiacRhythm:', cardiacRhythm);
-    console.log('  - editedStructuredData:', editedStructuredData);
-    console.log('  - finalData:', finalData);
+    // Minimal per-field diffs: "A : B -> C"
+    try {
+      const categories = new Set([
+        ...Object.keys(originalStructuredData || {}),
+        ...Object.keys(finalData || {})
+      ]);
+      categories.forEach((category) => {
+        const beforeCat = originalStructuredData?.[category];
+        const afterCat = finalData?.[category];
+        if (typeof afterCat === 'object' && afterCat !== null && !Array.isArray(afterCat)) {
+          const fields = new Set([
+            ...Object.keys(beforeCat || {}),
+            ...Object.keys(afterCat || {})
+          ]);
+          fields.forEach((field) => {
+            const beforeVal = beforeCat?.[field];
+            const afterVal = afterCat?.[field];
+            if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
+              const key = `${category}.${field}`;
+              console.log(`${key} : ${JSON.stringify(beforeVal)} -> ${JSON.stringify(afterVal)}`);
+            }
+          });
+        } else if (JSON.stringify(beforeCat) !== JSON.stringify(afterCat)) {
+          const key = `${category}`;
+          console.log(`${key} : ${JSON.stringify(beforeCat)} -> ${JSON.stringify(afterCat)}`);
+        }
+      });
+    } catch (_) { /* noop */ }
     
     if (onApplyWithSummary) {
       setIsGeneratingSummary(true);
-      console.log('🔧 [DetailEditor] Calling onApplyWithSummary with:', finalData);
       await onApplyWithSummary(finalData);
-      console.log('🔧 [DetailEditor] onApplyWithSummary completed');
       setIsGeneratingSummary(false);
     } else {
-      console.log('🔧 [DetailEditor] Calling onUpdate with:', finalData);
       onUpdate(finalData);
-      console.log('🔧 [DetailEditor] onUpdate completed');
     }
+
+    // After successful apply, sync originals and clear change flag
+    setOriginalStructuredData(finalData);
+    setEditedStructuredData(finalData);
+    setHasChanges(false);
   };
 
   // Cancel changes
   const handleCancel = () => {
     setEditedStructuredData(originalStructuredData);
-    // Reset dropdown values to original
-    setImageQuality(originalImageQuality);
-    setCardiacRhythm(originalCardiacRhythm);
     setHasChanges(false);
   };
 
@@ -384,13 +397,6 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
   const handleReset = () => {
     setEditedStructuredData(structuredData || {});
     setOriginalStructuredData(structuredData || {});
-    // Reset dropdown values to patient data
-    if (patientData) {
-      setImageQuality(patientData.image_quality || 'normal');
-      setCardiacRhythm(patientData.cardiac_rhythm || 'normal');
-      setOriginalImageQuality(patientData.image_quality || 'normal');
-      setOriginalCardiacRhythm(patientData.cardiac_rhythm || 'normal');
-    }
     setHasChanges(false);
   };
 
@@ -398,6 +404,8 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
   const handleSave = () => {
     handleApply();
   };
+
+  // Inline dropdowns moved into DetailEditor to share editedStructuredData/hasChanges
 
   // Reusable custom dropdown for feature fields (styling consistent with current design)
   const FeatureDropdown = ({ options, value, onChange, placeholder = 'Select...' }) => {
@@ -493,12 +501,7 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
     // Check if options is an array, if not return null or render as text input
     if (!Array.isArray(options)) {
       // For non-array options (like "float"), render as text input
-      let currentValue;
-      if (category === field) {
-        currentValue = editedStructuredData[category];
-      } else {
-        currentValue = editedStructuredData[category]?.[field];
-      }
+      const currentValue = editedStructuredData[category]?.[field];
       
       return (
         <input
@@ -506,15 +509,7 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
           className="field-input"
           value={currentValue || ''}
           onChange={(e) => {
-            console.log('🧪 recommend-set:text', { category, field, value: e.target.value, patientData });
-            if (category === field) {
-              setEditedStructuredData(prev => ({
-                ...prev,
-                [category]: e.target.value
-              }));
-            } else {
-              handleFieldChange(category, field, e.target.value);
-            }
+            handleFieldChange(category, field, e.target.value);
           }}
           placeholder="Enter value"
         />
@@ -522,14 +517,8 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
     }
     
     // Handle single-field categories (like image_quality, cardiac_rhythm)
-    let currentValue;
-    if (category === field) {
-      // Single field category
-      currentValue = editedStructuredData[category];
-    } else {
-      // Nested field
-      currentValue = editedStructuredData[category]?.[field];
-    }
+    // Always treat as nested field to maintain shape: { category: { field: value } }
+    const currentValue = editedStructuredData[category]?.[field];
     
     // For boolean values (yes/no), render as checkbox
     if (options.length === 2 && options.includes('yes') && options.includes('no')) {
@@ -540,15 +529,7 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
           checked={currentValue === 'yes'}
           onChange={(e) => {
             const newValue = e.target.checked ? 'yes' : 'no';
-            console.log('🧪 recommend-set:checkbox', { category, field, value: newValue, patientData });
-            if (category === field) {
-              setEditedStructuredData(prev => ({
-                ...prev,
-                [category]: newValue
-              }));
-            } else {
-              handleFieldChange(category, field, newValue);
-            }
+            handleFieldChange(category, field, newValue);
           }}
         />
       );
@@ -560,15 +541,7 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
         options={options}
         value={currentValue || ''}
         onChange={(newValue) => {
-          console.log('🧪 recommend-set:feature-dropdown', { category, field, value: newValue, patientData });
-          if (category === field) {
-            setEditedStructuredData(prev => ({
-              ...prev,
-              [category]: newValue
-            }));
-          } else {
-            handleFieldChange(category, field, newValue);
-          }
+          handleFieldChange(category, field, newValue);
         }}
       />
     );
@@ -754,7 +727,6 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
                       type="text"
                       value={currentValue || ''}
                       onChange={(e) => {
-                        console.log('🧪 recommend-set:fallback', { category: fieldCategory, field: item.feature, value: e.target.value, patientData });
                         handleFieldChange(fieldCategory, item.feature, e.target.value);
                       }}
                       placeholder="Enter value"
@@ -1000,6 +972,10 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [keywordVideos, setKeywordVideos] = useState([]);
   const [showingVideos, setShowingVideos] = useState(false);
   const [selectedVideoCategory, setSelectedVideoCategory] = useState('all');
+  // External edit bridge: top-bar dropdown -> DetailEditor editedStructuredData
+  const [externalEdit, setExternalEdit] = useState(null);
+  // Local edited data state for dropdown display
+  const [editedStructuredData, setEditedStructuredData] = useState(structuredData || {});
   const [availableCategories, setAvailableCategories] = useState([]);
   const [allVideosData, setAllVideosData] = useState([]);
   const [expandedVideo, setExpandedVideo] = useState(null);
@@ -1012,7 +988,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [isUpdatingStructuredData, setIsUpdatingStructuredData] = useState(false); // Loading state for AI update
   const [isChatActive, setIsChatActive] = useState(false);
   const [chatMinimized, setChatMinimized] = useState(true);
-  const [savedChatHeight, setSavedChatHeight] = useState(50);
+  const [savedChatHeight, setSavedChatHeight] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
   const panelTransitionTimeoutRef = useRef(null);
   const scrollTimeoutRef = useRef(null);
@@ -1042,20 +1018,16 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [loadingPhase, setLoadingPhase] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   
-  // Dropdown states
-  const [imageQuality, setImageQuality] = useState('normal');
-  const [cardiacRhythm, setCardiacRhythm] = useState('normal');
+  // Dropdown open states
   const [isImageQualityOpen, setIsImageQualityOpen] = useState(false);
   const [isCardiacRhythmOpen, setIsCardiacRhythmOpen] = useState(false);
-  
-  // Original dropdown values for reset/cancel functionality
-  const [originalImageQuality, setOriginalImageQuality] = useState('normal');
-  const [originalCardiacRhythm, setOriginalCardiacRhythm] = useState('normal');
-  
-  // Monitor structuredData changes for debugging
+
+  // Sync editedStructuredData when structuredData changes
   useEffect(() => {
-    console.log('🔧 [PatientAssessment] structuredData changed to:', structuredData);
+    setEditedStructuredData(structuredData || {});
   }, [structuredData]);
+  
+
 
   // Enhanced resize functionality with performance optimization
   const handleResizeStart = useCallback((e) => {
@@ -1423,15 +1395,11 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         
         setPatientData(prev => {
           const newPatientData = { ...prev, ...flattenedData };
-          console.log('📊 Previous patientData:', prev);
-          console.log('📊 Updated patientData:', newPatientData);
           return newPatientData;
         });
         
         // Re-extract keywords for the updated summary
         if (editedSummary) {
-          console.log('🔑 Re-extracting keywords for updated summary...');
-          console.log('📝 Summary for keyword extraction:', editedSummary);
           await handleKeywordExtraction(editedSummary);
         }
         
@@ -1456,10 +1424,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const handleSummaryReset = async () => {
     // Reset to original patient data and regenerate everything
     if (originalPatientData) {
-      console.log('🔄 Resetting to original patient data...');
-      console.log('📊 Original patientData:', originalPatientData.patientData);
-      console.log('📊 Original structuredData:', originalPatientData.structuredData);
-      console.log('📝 Original summary:', originalPatientData.summary);
       
       // Restore original states
       setPatientData(originalPatientData.patientData);
@@ -1474,10 +1438,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       setEditedSummary('');
     } else {
       // If no backup, regenerate from initial patient data
-      console.log('🔄 Regenerating structuredData from initial patient data...');
-      console.log('📊 Initial patient data:', patient);
       const structured = structurePatientData(patient);
-      console.log('📊 Newly generated structuredData:', structured);
       setStructuredData(structured);
       setPatientData(patient);
       
@@ -1512,7 +1473,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       
       setVideoSegments(segments);
     } catch (err) {
-      console.error('Error loading video segments:', err);
+      console.error('Error Load Echocardiographic Exam:', err);
       setError('Failed to load video segments');
     } finally {
       setIsLoadingVideos(false);
@@ -1551,12 +1512,18 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     setStreamingSummary(''); // Clear streaming summary
     
     try {
-      console.log('🔄 Starting AI summary generation via WebSocket...');
-      
+      // Ensure structuredData is available; build from patientData if missing
+      let sd = structuredData && Object.keys(structuredData).length > 0
+        ? structuredData
+        : structurePatientData(patientData);
+      if (!structuredData || Object.keys(structuredData).length === 0) {
+        setStructuredData(sd);
+      }
       // Send summary generation request via WebSocket
       const summaryRequest = {
         type: 'generate_summary',
-        patientData: patientData
+        patientData: patientData,
+        structuredData: sd
       };
       
       activeSocket.emit('generate_summary', summaryRequest);
@@ -1579,19 +1546,16 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const handleGenerateSummary = async () => {
     // Prevent duplicate execution using ref
     if (hasGeneratedSummaryRef.current) {
-      console.log('⚠️ Summary already generated, skipping...');
       return;
     }
     
     // Prevent duplicate execution
     if (isGeneratingSummary) {
-      console.log('⚠️ Summary generation already in progress, skipping...');
       return;
     }
     
     // Prevent execution if summary already exists and keywords are extracted
     if (summary && summaryKeywords.length > 0) {
-      console.log('⚠️ Summary and keywords already exist, skipping generation...');
       hasGeneratedSummaryRef.current = true; // Mark as generated
       // Loading 완료 처리
       updateLoadingPhase(5, 'Assessment ready!');
@@ -1618,27 +1582,30 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     setError(null);
     
     try {
-      console.log('🔄 Starting AI summary generation via HTTP...');
-      console.log('🔍 patientData:', patientData);
-      
       // Phase 4로 업데이트 (keywords extraction 대기)
       updateLoadingPhase(4, 'Generating AI summary...');
       
-      const aiSummary = await generateSummary(patientData);
-      setSummary(aiSummary);
-      console.log('✅ AI Summary generated');
+      // Prefer structuredData as input; build from patientData if missing
+      let sd = structuredData && Object.keys(structuredData).length > 0
+        ? structuredData
+        : structurePatientData(patientData);
+      if (!structuredData || Object.keys(structuredData).length === 0) {
+        setStructuredData(sd);
+      }
       
-      // Generate structured data for keyword extraction
-      const structured = structurePatientData(patientData);
-      setStructuredData(structured);
+      // Generate summary directly from structuredData
+      const aiSummary = await generateSummaryFromStructuredData(sd);
+
+      console.log('🔍 aiSummary:', aiSummary);
+
+      setSummary(aiSummary);
       
       // Extract keywords from the generated summary (only if not already extracted)
       if (aiSummary && summaryKeywords.length === 0) {
         setIsExtractingKeywords(true);
         setKeywordErr(null);
         try {
-          console.log('🔑 Extracting keywords...');
-          const result = await extractKeywordsFromSummary(aiSummary, structured, patient.exam_id);
+          const result = await extractKeywordsFromSummary(aiSummary, sd, patient.exam_id);
           
           if (result && result.keywords && Array.isArray(result.keywords)) {
             setSummaryKeywords(result.keywords);
@@ -1646,7 +1613,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
             setSummaryKeywords([]);
           }
         } catch (kwErr) {
-          console.error('❌ Failed to extract keywords:', kwErr);
           setKeywordErr(`Failed to extract keywords: ${kwErr.message || 'Unknown error'}`);
           setSummaryKeywords([]);
         } finally {
@@ -1658,7 +1624,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           }, 10000);
         }
       } else if (summaryKeywords.length > 0) {
-        console.log('ℹ️ Keywords already extracted, skipping...');
         // Update loading phase to complete
         updateLoadingPhase(5, 'Assessment ready!');
         setTimeout(() => {
@@ -1666,7 +1631,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         }, 10000);
       }
     } catch (err) {
-      console.error('❌ Failed to generate summary:', err);
       setError('Failed to generate AI summary. Please try again.');
     } finally {
       setIsGeneratingSummary(false);
@@ -1681,8 +1645,28 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       return [];
     }
     
-    // Handle multiple categories
-    const categories = Array.isArray(keywordObj.category) ? keywordObj.category : [keywordObj.category];
+    // Extract categories from new structure: key_feature_by_category and key_measure_feature_by_category
+    let categories = [];
+    
+    // Check if keywordObj has the new structure
+    if (keywordObj.key_feature_by_category) {
+      const featureCategories = Object.keys(keywordObj.key_feature_by_category);
+      categories = [...categories, ...featureCategories];
+    }
+    
+    if (keywordObj.key_measure_feature_by_category) {
+      const measureCategories = Object.keys(keywordObj.key_measure_feature_by_category);
+      categories = [...categories, ...measureCategories];
+    }
+    
+    // Fallback to old structure if new structure doesn't exist
+    if (categories.length === 0 && keywordObj.category) {
+      categories = Array.isArray(keywordObj.category) ? keywordObj.category : [keywordObj.category];
+    }
+    
+    // Remove duplicates
+    categories = [...new Set(categories)];
+    
     console.log('🔍 Filtering videos for categories:', categories);
     console.log('📊 Total videos available:', allVideosData.length);
     
@@ -1851,20 +1835,32 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
             setHighlightedFeature(null);
           }, 3000);
         }
-      } else if (keywordObj.category) {
-        // If no features, fall back to video category selection
+      } else {
+        // If no features, try to get video category from new structure or fall back to old structure
+        let videoCategory = null;
         
-        // Special handling for general category keywords
-        let videoCategory = Array.isArray(keywordObj.category) ? keywordObj.category[0] : keywordObj.category;
-        if (['image_quality', 'cardiac_rhythm_abnormality', 'cardiac_rhythm'].includes(videoCategory)) {
-          videoCategory = 'general';
+        // Try to get category from new structure first
+        if (keywordObj.key_feature_by_category && Object.keys(keywordObj.key_feature_by_category).length > 0) {
+          videoCategory = Object.keys(keywordObj.key_feature_by_category)[0];
+        } else if (keywordObj.key_measure_feature_by_category && Object.keys(keywordObj.key_measure_feature_by_category).length > 0) {
+          videoCategory = Object.keys(keywordObj.key_measure_feature_by_category)[0];
+        } else if (keywordObj.category) {
+          // Fallback to old structure
+          videoCategory = Array.isArray(keywordObj.category) ? keywordObj.category[0] : keywordObj.category;
         }
         
-        setSelectedVideoCategory(videoCategory);
-        console.log('📹 Video category selected:', videoCategory);
-        
-        // Use debounced scroll for video panel
-        scrollToElementDebounced('.video-panel');
+        if (videoCategory) {
+          // Special handling for general category keywords
+          if (['image_quality', 'cardiac_rhythm_abnormality', 'cardiac_rhythm'].includes(videoCategory)) {
+            videoCategory = 'general';
+          }
+          
+          setSelectedVideoCategory(videoCategory);
+          console.log('📹 Video category selected:', videoCategory);
+          
+          // Use debounced scroll for video panel
+          scrollToElementDebounced('.video-panel');
+        }
       }
     } else {
       // Even if keyword resolution fails, still open the panel
@@ -1925,38 +1921,36 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     
     // If expanding, use saved height or default to 50:50
     if (activate) {
-      const targetSummaryHeight = savedChatHeight > 0 ? 100 - savedChatHeight : 50;
+      const targetSummaryHeight = savedChatHeight > 0 ? 100 - savedChatHeight : 30;
       setSummaryHeight(targetSummaryHeight);
     } else {
       // Collapsing to minimized state (90:10)
       setSummaryHeight(90);
     }
 
-    // Step 1: Add animating class and prepare for GPU acceleration
-    requestAnimationFrame(() => {
-      summaryPanel.classList.add('chat-animating');
+    // 1단계: 애니메이션 클래스만 추가
+    summaryPanel.classList.add('chat-animating');
+    
+    // 2단계: 약간의 지연 후 상태 변경 (transition이 적용되도록)
+    setTimeout(() => {
+      if (activate) {
+        summaryPanel.classList.add('chat-active');
+      } else {
+        summaryPanel.classList.remove('chat-active');
+      }
       
-      // Step 2: Apply the active state
-      requestAnimationFrame(() => {
-        if (activate) {
-          summaryPanel.classList.add('chat-active');
-        } else {
-          summaryPanel.classList.remove('chat-active');
-        }
+      // 3단계: 애니메이션 완료 후 정리
+      setTimeout(() => {
+        summaryPanel.classList.remove('chat-animating');
         
-        // Step 3: Clean up after animation completes
-        setTimeout(() => {
-          summaryPanel.classList.remove('chat-animating');
-          
-          // Remove will-change properties for memory optimization
-          const summarySection = summaryPanel.querySelector('.summary-section');
-          const chatbotSection = summaryPanel.querySelector('.chatbot-section');
-          
-          if (summarySection) summarySection.style.willChange = 'auto';
-          if (chatbotSection) chatbotSection.style.willChange = 'auto';
-        }, 400); // Match CSS transition duration
-      });
-    });
+        // Remove will-change properties for memory optimization
+        const summarySection = summaryPanel.querySelector('.summary-section');
+        const chatbotSection = summaryPanel.querySelector('.chatbot-section');
+        
+        if (summarySection) summarySection.style.willChange = 'auto';
+        if (chatbotSection) chatbotSection.style.willChange = 'auto';
+      }, 400); // Match CSS transition duration
+    }, 50); // 50ms 지연으로 transition이 적용되도록 함
   }, [savedChatHeight]);
 
   // Enhanced chat key handling with ESC functionality
@@ -2061,7 +2055,10 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           }
         };
         
-        console.log('📤 메시지 전송:', messageData);
+        console.log('💬 [Chat] Input message:');
+        console.log('    ', messageText);
+        console.log('💬 [Chat] Output data sent:');
+        console.log('    ', messageData);
         
         socket.emit('message', messageData);
       } else {
@@ -2082,10 +2079,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
   // Debug AI Canvas visibility
   const debugCanvasVisibility = useCallback(() => {
-    console.log('🎨 DEBUG Canvas Visibility:');
-    console.log('  - isChatActive:', isChatActive);
-    console.log('  - showDetailPanel:', showDetailPanel);
-    console.log('  - Condition result:', isChatActive && showDetailPanel);
   }, [isChatActive, showDetailPanel]);
 
   // Debug on state changes
@@ -2111,9 +2104,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     });
 
     newSocket.on('connect', () => {
-      console.log('✅ Connected to chat server');
+      console.log('🔌 [WebSocket] Connected to chat server');
       setIsConnected(true);
-      console.log('🚀 WebSocket ready for chat!');
       // Don't auto-generate summary on connection - only on initial load
     });
 
@@ -2129,7 +2121,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
     // Handle direct messages (fallback for non-function-calling responses)
     newSocket.on('message', (data) => {
-      console.log('🤖 챗봇 답변:', data);
+      console.log('💬 [Chat] Response received:');
+      console.log('    ', data);
       
       // Only add message if it's not already being streamed or completed
       setMessages(prev => {
@@ -2353,9 +2346,11 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       const flattenedData = {};
       Object.entries(updatedStructuredData).forEach(([category, value]) => {
         if (typeof value === 'object' && value !== null) {
-          // Nested object
+          // Nested object - 중첩된 구조 유지
           Object.entries(value).forEach(([field, fieldValue]) => {
-            flattenedData[field] = fieldValue;
+            // 중첩된 구조를 유지하면서 flat key도 생성
+            flattenedData[`${category}//${field}`] = fieldValue;  // 중첩 구조 유지
+            flattenedData[field] = fieldValue;  // flat key도 생성 (기존 호환성)
           });
         } else {
           // Direct value
@@ -2374,18 +2369,16 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       
       try {
         console.log('📝 Generating new summary from updated structuredData...');
+        console.log('🔍 updatedStructuredData:', updatedStructuredData);
         const newSummary = await generateSummaryFromStructuredData(updatedStructuredData);
         
         if (newSummary) {
           setSummary(newSummary);
           
-          // Re-extract keywords for the new summary (only if not already extracted)
-          if (summaryKeywords.length === 0) {
-            console.log('🔑 Re-extracting keywords for new summary...');
-            await handleKeywordExtraction(newSummary);
-          } else {
-            console.log('ℹ️ Keywords already extracted, skipping...');
-          }
+          // Always re-extract keywords for the new summary to reflect updated features
+          console.log('🔑 Re-extracting keywords for new summary...');
+          console.log('🔍 newSummary:', newSummary);
+          await handleKeywordExtraction(newSummary);
           
           console.log('✅ Summary regenerated successfully');
         } else {
@@ -2421,9 +2414,11 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     const flattenedData = {};
     Object.entries(updatedStructuredData).forEach(([category, value]) => {
       if (typeof value === 'object' && value !== null) {
-        // Nested object
+        // Nested object - 중첩된 구조 유지
         Object.entries(value).forEach(([field, fieldValue]) => {
-          flattenedData[field] = fieldValue;
+          // 중첩된 구조를 유지하면서 flat key도 생성
+          flattenedData[`${category}//${field}`] = fieldValue;  // 중첩 구조 유지
+          flattenedData[field] = fieldValue;  // flat key도 생성 (기존 호환성)
         });
       } else {
         // Direct value
@@ -2926,8 +2921,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     // Start loading sequence
     const initializeAssessment = async () => {
       try {
-        // Phase 1: Loading video segments (최소 1.5초 표시)
-        updateLoadingPhase(1, 'Loading video segments...');
+        // Phase 1: Load Echocardiographic Exam (최소 1.5초 표시)
+        updateLoadingPhase(1, 'Load Echocardiographic Exam...');
         const videoPromise = loadVideoSegments();
         await Promise.all([
           videoPromise,
@@ -2935,7 +2930,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         ]);
         
         // Phase 2: Loading exam entry (최소 1초 표시)
-        updateLoadingPhase(2, 'Loading exam data...');
+        updateLoadingPhase(2, 'Preprocess Dicoms...');
         const examPromise = getExamEntryById(patient.exam_id);
         const [entry] = await Promise.all([
           examPromise,
@@ -3028,35 +3023,17 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     
     if (editPanel) {
       const rect = editPanel.getBoundingClientRect();
-      console.log('🔄 edit-panel dimensions:', {
-        width: rect.width,
-        height: rect.height,
-        left: rect.left,
-        top: rect.top
-      });
     }
   }, [showDetailPanel]);
 
   // Prefill structuredData whenever patientData changes
   useEffect(() => {
-    const built = buildStructuredFromPatientData(patientData);
-    if (built) setStructuredData(built);
+    console.log('patientData!!!!!!!!!!!!!!!!!!!!!!!!:', patientData);
+    const built = structurePatientData(patientData);
+    console.log('built!!!!!!!!!!!!!!!!!!!!!!!!:', built);
   }, [patientData]);
   
-  // Set dropdown initial values from patient data
-  useEffect(() => {
-    if (patientData) {
-      // Set image quality from patient data
-      if (patientData.image_quality) {
-        setImageQuality(patientData.image_quality);
-      }
-      
-      // Set cardiac rhythm from patient data
-      if (patientData.cardiac_rhythm) {
-        setCardiacRhythm(patientData.cardiac_rhythm);
-      }
-    }
-  }, [patientData]);
+
   
   // Handle click outside dropdown to close them
   useEffect(() => {
@@ -3098,10 +3075,10 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
             <h3>{loadingPhase === 5 ? 'Assessment Complete!' : 'Initializing Assessment...'}</h3>
             <div className="loading-steps">
               <div className={`step ${loadingPhase >= 1 ? 'completed' : 'pending'}`}>
-                {loadingPhase >= 1 ? '✓' : '⏳'} Loading video segments
+                {loadingPhase >= 1 ? '✓' : '⏳'} Load Echocardiographic Exam
               </div>
               <div className={`step ${loadingPhase === 2 ? 'active' : loadingPhase > 2 ? 'completed' : 'pending'}`}>
-                {loadingPhase > 2 ? '✓' : loadingPhase === 2 ? '🔄' : '⏳'} Loading exam data
+                {loadingPhase > 2 ? '✓' : loadingPhase === 2 ? '🔄' : '⏳'} Preprocess Dicoms
               </div>
               <div className={`step ${loadingPhase === 3 ? 'active' : loadingPhase > 3 ? 'completed' : 'pending'}`}>
                 {loadingPhase > 3 ? '✓' : loadingPhase === 3 ? '🔄' : '⏳'} EchoVerse Inference
@@ -3120,8 +3097,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
             ) : (
               <p className="loading-note">
                 {loadingPhase === 0 && "Initializing assessment environment..."}
-                {loadingPhase === 1 && "Loading video segments..."}
-                {loadingPhase === 2 && "Loading exam data..."}
+                {loadingPhase === 1 && "Load Echocardiographic Exam..."}
+                {loadingPhase === 2 && "Preprocess Dicoms..."}
                 {loadingPhase === 3 && "EchoVerse Inference..."}
                 {loadingPhase === 4 && "Generate EchoPilot Summary..."}
               </p>
@@ -3243,7 +3220,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
           {/* Right side controls container */}
           <div className="right-controls-container">
-            {/* Image Quality Dropdown */}
+            {/* Image Quality Dropdown (top bar -> DetailEditor bridge) */}
             <div className="dropdown-card">
               <span className="dropdown-label">Image Quality</span>
               <div 
@@ -3254,7 +3231,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                 }}
               >
                 <span className="dropdown-value">
-                  {imageQuality === 'normal' ? 'Normal' : 'Poor'}
+                  {(editedStructuredData?.image_quality?.image_quality) === 'normal' ? 'Normal' : 'Poor'}
                 </span>
                 <div className={`dropdown-icon ${isImageQualityOpen ? 'open' : ''}`}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -3265,23 +3242,25 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               {isImageQualityOpen && (
                 <div className="dropdown-options">
                   <div 
-                    className={`dropdown-option ${imageQuality === 'normal' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.image_quality?.image_quality) === 'normal' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('🔧 [Dropdown] Image Quality changed to: normal');
-                      setImageQuality('normal');
                       setIsImageQualityOpen(false);
+                      // Bridge to DetailEditor edit state
+                      setExternalEdit({ category: 'image_quality', field: 'image_quality', value: 'normal' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Normal
                   </div>
                   <div 
-                    className={`dropdown-option ${imageQuality === 'poor' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.image_quality?.image_quality) === 'poor' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('🔧 [Dropdown] Image Quality changed to: poor');
-                      setImageQuality('poor');
                       setIsImageQualityOpen(false);
+                      // Bridge to DetailEditor edit state
+                      setExternalEdit({ category: 'image_quality', field: 'image_quality', value: 'poor' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Poor
@@ -3290,7 +3269,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               )}
             </div>
 
-            {/* Cardiac Rhythm Dropdown */}
+            {/* Cardiac Rhythm Dropdown (top bar -> DetailEditor bridge) */}
             <div className="dropdown-card">
               <span className="dropdown-label">Cardiac Rhythm</span>
               <div 
@@ -3300,14 +3279,19 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                   setIsCardiacRhythmOpen(!isCardiacRhythmOpen);
                 }}
               >
-                <span className="dropdown-value">
-                  {cardiacRhythm === 'normal' ? 'Normal' : 
-                   cardiacRhythm === 'atrial_fibrillation' ? 'Atrial Fibrillation' :
-                   cardiacRhythm === 'atrial_flutter' ? 'Atrial Flutter' :
-                   cardiacRhythm === 'ventricular_premature_beat' ? 'Ventricular Premature Beat' :
-                   cardiacRhythm === 'atrial_premature_beat' ? 'Atrial Premature Beat' :
-                   cardiacRhythm === 'paced_rhythm' ? 'Paced Rhythm' : 'Other'}
-                </span>
+                                  <span className="dropdown-value">
+                                          {(() => {
+                        const rhythm = editedStructuredData?.cardiac_rhythm;
+                       
+
+                        return rhythm?.cardiac_rhythm === 'normal' ? 'Normal' : 
+                               rhythm?.cardiac_rhythm === 'atrial_fibrillation' ? 'Atrial Fibrillation' :
+                               rhythm?.cardiac_rhythm === 'atrial_flutter' ? 'Atrial Flutter' :
+                               rhythm?.cardiac_rhythm === 'ventricular_premature_beat' ? 'Ventricular Premature Beat' :
+                               rhythm?.cardiac_rhythm === 'atrial_premature_beat' ? 'Atrial Premature Beat' :
+                               rhythm?.cardiac_rhythm === 'paced_rhythm' ? 'Paced Rhythm' : 'Other';
+                      })()}
+                  </span>
                 <div className={`dropdown-icon ${isCardiacRhythmOpen ? 'open' : ''}`}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M4 6l4 4 4-4" stroke="#FFFFFF" strokeWidth="2" fill="none"/>
@@ -3317,72 +3301,78 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               {isCardiacRhythmOpen && (
                 <div className="dropdown-options">
                   <div 
-                    className={`dropdown-option ${cardiacRhythm === 'normal' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'normal' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('🔧 [Dropdown] Cardiac Rhythm changed to: normal');
-                      setCardiacRhythm('normal');
                       setIsCardiacRhythmOpen(false);
+                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'normal' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Normal
                   </div>
                   <div 
-                    className={`dropdown-option ${cardiacRhythm === 'atrial_fibrillation' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_fibrillation' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCardiacRhythm('atrial_fibrillation');
                       setIsCardiacRhythmOpen(false);
+                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'atrial_fibrillation' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Atrial Fibrillation
                   </div>
                   <div 
-                    className={`dropdown-option ${cardiacRhythm === 'atrial_flutter' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_flutter' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCardiacRhythm('atrial_flutter');
                       setIsCardiacRhythmOpen(false);
+                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'atrial_flutter' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Atrial Flutter
                   </div>
                   <div 
-                    className={`dropdown-option ${cardiacRhythm === 'ventricular_premature_beat' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'ventricular_premature_beat' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCardiacRhythm('ventricular_premature_beat');
                       setIsCardiacRhythmOpen(false);
+                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'ventricular_premature_beat' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Ventricular Premature Beat
                   </div>
                   <div 
-                    className={`dropdown-option ${cardiacRhythm === 'atrial_premature_beat' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_premature_beat' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCardiacRhythm('atrial_premature_beat');
                       setIsCardiacRhythmOpen(false);
+                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'atrial_premature_beat' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Atrial Premature Beat
                   </div>
                   <div 
-                    className={`dropdown-option ${cardiacRhythm === 'paced_rhythm' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'paced_rhythm' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCardiacRhythm('paced_rhythm');
                       setIsCardiacRhythmOpen(false);
+                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'paced_rhythm' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Paced Rhythm
                   </div>
                   <div 
-                    className={`dropdown-option ${cardiacRhythm === 'other' ? 'selected' : ''}`}
+                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'other' ? 'selected' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCardiacRhythm('other');
                       setIsCardiacRhythmOpen(false);
+                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'other' });
+                      setShowDetailPanel(true);
                     }}
                   >
                     Other
@@ -3426,29 +3416,10 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
             </div>
           </div>
           
-          {/* Category Dropdown */}
-          {/* {allVideosData.length > 0 && (
-            <div className="category-selector">
-              <label className="category-label">Filter by Category:</label>
-              <select 
-                className="category-dropdown"
-                value={selectedVideoCategory}
-                onChange={(e) => setSelectedVideoCategory(e.target.value)}
-              >
-                <option value="all">All Categories</option>
-                {availableCategories.map(category => (
-                  <option key={category} value={category}>
-                    {category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )} */}
-          
           {isLoadingVideos ? (
             <div className="loading-container">
               <div className="loading-spinner"></div>
-              <p>Loading video segments...</p>
+              <p>Load Echocardiographic Exam...</p>
             </div>
           ) : (
             <div className="videos-grid">
@@ -3494,12 +3465,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                   <img src="/logo/plus.PNG" alt="Plus Logo" className="ai-logo" />
                 </div>
                 <span>Clinical Summary Report</span>
-                {isExtractingKeywords && (
-                  <div className="keyword-extracting-indicator">
-                    <div className="keyword-spinner"></div>
-                    <span>Extracting keywords...</span>
-                  </div>
-                )}
+
               </div>
               {summary && (
                 <button 
@@ -3520,7 +3486,16 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               {streamingSummary ? (
                 renderClickableSummary(streamingSummary)
               ) : summary ? (
-                renderClickableSummary(summary)
+                isGeneratingSummary || isExtractingKeywords ? (
+                  <div className="generating-summary-overlay">
+                    <div className="loading-spinner"></div>
+                    <span>
+                      {isGeneratingSummary ? 'Regenerating summary...' : 'Extracting keywords...'}
+                    </span>
+                  </div>
+                ) : (
+                  renderClickableSummary(summary)
+                )
               ) : (
                 <div className="empty-summary-content">
                   <div className="empty-summary-icon">📋</div>
@@ -3661,11 +3636,11 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                   {/* Always show welcome message */}
                   <div className="chat-welcome-message">
                     <div className="ai-message">
-                      <div className="ai-avatar">
+                      <div className="message-avatar">
                         <img src="/logo/plus.PNG" alt="AI" className="ai-logo" />
                       </div>
                       <div className="message-content">
-                        안녕하세요! 심초음파 검사 결과를 분석하는 데 도움을 드리겠습니다. 환자의 심장 상태에 대해 무엇이든 물어보세요.
+                        Hello! I'm here to help you analyze echocardiogram results. Please ask me anything about the patient's heart condition.
                       </div>
                     </div>
                   </div>
@@ -3777,8 +3752,21 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                       const [sentenceNumStr, normalizedKeyword] = selectedKeyword.split('::');
                       const sentenceNumber = parseInt(sentenceNumStr);
                       const ko = resolveKeyword(sentenceNumber, normalizedKeyword);
-                      const byCat = ko && ko.key_feature_by_category ? ko.key_feature_by_category : {};
-                      Object.keys(byCat).forEach(c => cats.add(c));
+                      
+                      // Extract categories from new structure
+                      if (ko && ko.key_feature_by_category) {
+                        Object.keys(ko.key_feature_by_category).forEach(c => cats.add(c));
+                      }
+                      
+                      if (ko && ko.key_measure_feature_by_category) {
+                        Object.keys(ko.key_measure_feature_by_category).forEach(c => cats.add(c));
+                      }
+                      
+                      // Fallback to old structure if new structure doesn't exist
+                      if (cats.size === 0 && ko && ko.category) {
+                        const categories = Array.isArray(ko.category) ? ko.category : [ko.category];
+                        categories.forEach(c => cats.add(c));
+                      }
                     }
                     return [...cats].map((category, index) => (
                       <span key={index} className="category-tag">
@@ -3843,14 +3831,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                   selectedKeyword={selectedKeyword}
                   resolveKeyword={resolveKeyword}
                   mapFeatureToField={mapFeatureToField}
-                  imageQuality={imageQuality}
-                  setImageQuality={setImageQuality}
-                  cardiacRhythm={cardiacRhythm}
-                  setCardiacRhythm={setCardiacRhythm}
-                  originalImageQuality={originalImageQuality}
-                  setOriginalImageQuality={setOriginalImageQuality}
-                  originalCardiacRhythm={originalCardiacRhythm}
-                  setOriginalCardiacRhythm={setOriginalCardiacRhythm}
+                  externalEdit={externalEdit}
+                  onEditedDataChange={setEditedStructuredData}
                 />
               )}
           </div>
@@ -3867,19 +3849,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                 <h2 className="expanded-video-name">
                   {expandedVideo.name || expandedVideo.viewLabel}
                 </h2>
-                <div className="expanded-video-meta">
-                  <span className="expanded-confidence">
-                    AI Confidence: {expandedVideo.confidence || `${(expandedVideo.weight * 100).toFixed(1)}%`}
-                  </span>
-                  {expandedVideo.category && (
-                    <span className="expanded-confidence">
-                      Category: {expandedVideo.category}
-                    </span>
-                  )}
-                  {expandedVideo.isDemo && (
-                    <span className="expanded-confidence">Demo Video</span>
-                  )}
-                </div>
+
               </div>
               <button className="close-expansion-btn" onClick={() => setExpandedVideo(null)}>
                 <span>✕</span> Close
