@@ -50,7 +50,7 @@ python start_server.py
 - python backend: python python_backend/start_server.py - 
 - Node.js API Proxy Server: npm run api-server
 - WebSocket Server: npm run websocket-server
-- Frontend: npm run build -> npx serve -s build -l 30001
+- Frontend: npm run build -> npx serve -s build -l 3000
 
 ### Individual servers
 - Frontend (CRA): `npm start`
