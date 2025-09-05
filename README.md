@@ -13,7 +13,6 @@ Echopilot AI is a React app with a Node.js API, a WebSocket chat server, and an 
 
 ### Install
 ```bash
-cd echopilot-ai
 npm install
 ```
 
@@ -25,30 +24,37 @@ npm install
 ### Run (development)
 - All (Frontend + API + WebSocket):
 ```bash
-npm run dev
-```
-- Option: run Python backend in a separate terminal
-```bash
+
 # Terminal 1
-npm run dev
+npm run dev:complete
 
 # Terminal 2
 cd python_backend
 python start_server.py
 ```
 
+### Run (build)
+
+- .env 파일에서 다음 값들을 외부 IP로 변경
+- HOST=0.0.0.0
+- REACT_APP_PYTHON_BACKEND_URL=http://10.10.21.59:5000
+- REACT_APP_API_URL=http://10.10.21.59:5001
+- REACT_APP_WS_URL=ws://10.10.21.59:3002
+- REACT_APP_API_BASE_URL=http://10.10.21.59:5001
+- REACT_APP_PROXY_URL=http://10.10.21.59:5001
+- REACT_APP_BACKEND_URL=http://10.10.21.59:5000
+- CORS_ORIGINS=http://10.10.21.59:3000
+ 
+- python backend: python python_backend/start_server.py - 
+- Node.js API Proxy Server: npm run api-server
+- WebSocket Server: npm run websocket-server
+- Frontend: npm run build -> npx serve -s build -l 30001
 
 ### Individual servers
 - Frontend (CRA): `npm start`
 - API (Node): `npm run api-server`
 - WebSocket: `npm run websocket-server`
 - Python converter (optional): `npm run python-server`
-
-### Build
-```bash
-npm run build
-```
-Output: `echopilot-ai/build/`
 
 ---
 
@@ -96,35 +102,3 @@ Helper:
 - `callOpenAI(systemPrompt, userContent, options)` in `src/services/openaiService.js`
 
 ---
-
-## External Access Tips
-- WebSocket: ensure `WS_HOST=0.0.0.0`, open port (default `3002`) in firewall
-- CORS: set `CORS_ORIGINS` to `*` or include your frontend origin
-- Frontend external dev server: use `npm run dev:external`
-
-
-# 외부 실행 방법
-
-## .env 파일에서 다음 값들을 외부 IP로 변경
-- HOST=0.0.0.0
-- REACT_APP_PYTHON_BACKEND_URL=http://10.10.21.59:5000
-- REACT_APP_API_URL=http://10.10.21.59:5001
-- REACT_APP_WS_URL=ws://10.10.21.59:3002
-- REACT_APP_API_BASE_URL=http://10.10.21.59:5001
-- REACT_APP_PROXY_URL=http://10.10.21.59:5001
-- REACT_APP_BACKEND_URL=http://10.10.21.59:5000
-- CORS_ORIGINS=http://10.10.21.59:3000
- 
- 
-- python backend: python python_backend/start_server.py - 
-- Node.js API Proxy Server: npm run api-server
-- WebSocket Server: npm run websocket-server
-- Frontend: npm run build -> npx serve -s build -l 30001
-
-
-## local 실행 방법
- 
-- 10.10.21.59 -> 127.0.0.1
-
-- python python_backend\start_server.py
-- npm run dev:complete
