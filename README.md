@@ -103,28 +103,28 @@ Helper:
 - Frontend external dev server: use `npm run dev:external`
 
 
-# 외부 실행 방법
-# 
-# # .env 파일에서 다음 값들을 외부 IP로 변경
-# HOST=0.0.0.0
-# REACT_APP_PYTHON_BACKEND_URL=http://10.10.21.59:5000
-# REACT_APP_API_URL=http://10.10.21.59:5001
-# REACT_APP_WS_URL=ws://10.10.21.59:3002
-# REACT_APP_API_BASE_URL=http://10.10.21.59:5001
-# REACT_APP_PROXY_URL=http://10.10.21.59:5001
-# REACT_APP_BACKEND_URL=http://10.10.21.59:5000
-# CORS_ORIGINS=http://10.10.21.59:3000
-# 
-# 
-# 2.python backend: python python_backend/start_server.py - 
-# 3. Node.js API Proxy Server: npm run api-server
-# 4.WebSocket Server: npm run websocket-server
-# 5.Frontend: npm run build -> npx serve -s build -l 3000
+## 외부 실행 방법
+
+# .env 파일에서 다음 값들을 외부 IP로 변경
+ HOST=0.0.0.0
+ REACT_APP_PYTHON_BACKEND_URL=http://10.10.21.59:5000
+ REACT_APP_API_URL=http://10.10.21.59:5001
+ REACT_APP_WS_URL=ws://10.10.21.59:3002
+ REACT_APP_API_BASE_URL=http://10.10.21.59:5001
+ REACT_APP_PROXY_URL=http://10.10.21.59:5001
+ REACT_APP_BACKEND_URL=http://10.10.21.59:5000
+ CORS_ORIGINS=http://10.10.21.59:3000
+ 
+ 
+ 2.python backend: python python_backend/start_server.py - 
+ 3. Node.js API Proxy Server: npm run api-server
+ 4.WebSocket Server: npm run websocket-server
+ 5.Frontend: npm run build -> npx serve -s build -l 3000
 
 
-# local 실행 방법
-# 
-# 10.10.21.59 -> 127.0.0.1
-# 
-# python python_backend\start_server.py
-# npm run dev:complete
+## local 실행 방법
+ 
+10.10.21.59 -> 127.0.0.1
+
+python python_backend\start_server.py
+npm run dev:complete
