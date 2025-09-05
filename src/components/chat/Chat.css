@@ -622,20 +622,3 @@
   background: var(--primary);
 }
 
-@media (max-width: 768px) {
-  .chat-panel {
-    width: 100%;
-  }
-  
-  .chat-header {
-    padding: 15px;
-  }
-  
-  .message-list {
-    padding: 15px;
-  }
-  
-  .chat-input-container {
-    padding: 15px;
-  }
-}

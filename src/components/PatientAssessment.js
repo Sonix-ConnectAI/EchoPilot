@@ -5,6 +5,7 @@ import '../styles/PatientAssessment.css';
 import { generateSummary, structurePatientData, extractKeywordsFromSummary, updateStructuredDataFromSummary, generateSummaryFromStructuredData } from '../services/openaiService';
 import { npzToVideoUrl, cleanupVideoUrl } from '../utils/videoProcessor';
 import { getExamEntryById} from '../utils/dbUtils';
+import BottomSheet from './BottomSheet';
 
 // Standardized structure for all patient data fields
 const standardizedStructure = {
@@ -255,7 +256,7 @@ const standardizedStructure_measure = {
 };
 
 // DetailEditor Component for editing patient data - Memoized for performance
-const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, externalEdit, onEditedDataChange }) => {
+const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, externalEdit, onEditedDataChange, onFieldChange, onHandlersReady }) => {
   const [editedStructuredData, setEditedStructuredData] = useState(structuredData || {});
   const [originalStructuredData, setOriginalStructuredData] = useState(structuredData || {});
   const [hasChanges, setHasChanges] = useState(false);
@@ -330,6 +331,11 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
       }));
     }
     setHasChanges(true);
+    
+    // Notify parent component if onFieldChange is provided
+    if (onFieldChange) {
+      onFieldChange(category, field, value);
+    }
   };
 
   // Handle numeric field changes
@@ -339,7 +345,7 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
   };
 
   // Apply changes with summary regeneration
-  const handleApply = async () => {
+  const handleApply = useCallback(async () => {
     // Create final data (dropdown values are already in editedStructuredData)
     const finalData = {
       ...editedStructuredData
@@ -385,20 +391,36 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
     setOriginalStructuredData(finalData);
     setEditedStructuredData(finalData);
     setHasChanges(false);
-  };
+  }, [editedStructuredData, originalStructuredData, onApplyWithSummary]);
 
   // Cancel changes
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setEditedStructuredData(originalStructuredData);
     setHasChanges(false);
-  };
+  }, [originalStructuredData]);
 
   // Reset to original
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setEditedStructuredData(structuredData || {});
     setOriginalStructuredData(structuredData || {});
     setHasChanges(false);
-  };
+  }, [structuredData]);
+
+  // Memoize handlers to prevent infinite loops
+  const memoizedHandlers = useMemo(() => ({
+    handleApply,
+    handleCancel,
+    handleReset,
+    hasChanges,
+    isGeneratingSummary
+  }), [hasChanges, isGeneratingSummary]);
+
+  // Pass handlers to parent component
+  useEffect(() => {
+    if (onHandlersReady) {
+      onHandlersReady(memoizedHandlers);
+    }
+  }, [memoizedHandlers, onHandlersReady]);
 
   // Save changes (legacy support)
   const handleSave = () => {
@@ -967,6 +989,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [tooltipData, setTooltipData] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [examEntry, setExamEntry] = useState(null);
+  const [editorHandlers, setEditorHandlers] = useState(null);
   const tooltipRef = useRef(null);
   const [relatedVideos, setRelatedVideos] = useState([]);
   const [keywordVideos, setKeywordVideos] = useState([]);
@@ -1021,6 +1044,18 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   // Dropdown open states
   const [isImageQualityOpen, setIsImageQualityOpen] = useState(false);
   const [isCardiacRhythmOpen, setIsCardiacRhythmOpen] = useState(false);
+  const [isAllFeaturesOpen, setIsAllFeaturesOpen] = useState(false);
+
+  // Handle field changes for both DetailEditor and BottomSheet
+  const handleFieldChange = useCallback((category, field, value) => {
+    setEditedStructuredData(prev => ({
+      ...prev,
+      [category]: {
+        ...(prev[category] || {}),
+        [field]: value
+      }
+    }));
+  }, []);
 
   // Sync editedStructuredData when structuredData changes
   useEffect(() => {
@@ -3833,9 +3868,25 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                   mapFeatureToField={mapFeatureToField}
                   externalEdit={externalEdit}
                   onEditedDataChange={setEditedStructuredData}
+                  onFieldChange={handleFieldChange}
+                  onHandlersReady={setEditorHandlers}
                 />
               )}
           </div>
+          
+          {/* All Features Button */}
+          {/* <div className="edit-all-features-trigger">
+            <button 
+              className="edit-all-features-button"
+              onClick={() => setIsAllFeaturesOpen(true)}
+              title="View All Features"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M7 14l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span>All Features</span>
+            </button>
+          </div> */}
         </div>
       </div>
       
@@ -3891,11 +3942,278 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         </div>
       )}
 
+
+
       {/* Footer */}
       <div className="footer">
         <div className="footer-content">
         </div>
       </div>
+
+      {/* All Features Bottom Sheet */}
+      <BottomSheet
+        isOpen={isAllFeaturesOpen}
+        onClose={() => setIsAllFeaturesOpen(false)}
+        footerActionbar={
+          <div className="bottom-sheet-editor-actions">
+            <button 
+              className="btn-apply"
+              onClick={editorHandlers?.handleApply}
+              disabled={!editorHandlers?.hasChanges || editorHandlers?.isGeneratingSummary}
+            >
+              {editorHandlers?.isGeneratingSummary ? (
+                <>
+                  <div className="loading-spinner-small"></div>
+                  <span>Generating Summary...</span>
+                </>
+              ) : (
+                'Apply'
+              )}
+            </button>
+            <button 
+              className="btn-cancel"
+              onClick={() => {
+                editorHandlers?.handleCancel();
+                setIsAllFeaturesOpen(false);
+              }}
+              disabled={!editorHandlers?.hasChanges || editorHandlers?.isGeneratingSummary}
+            >
+              Cancel
+            </button>
+            <button 
+              className="btn-reset"
+              onClick={editorHandlers?.handleReset}
+              disabled={editorHandlers?.isGeneratingSummary}
+            >
+              Reset
+            </button>
+          </div>
+        }
+        title="All Features"
+        height="100%"
+      >
+        {/* Helper: All Features (Recommend-style) */}
+        {(() => {
+          const AllFeaturesRecommendStyle = ({ standardizedStructure, editedStructuredData, onChange }) => {
+            const categories = Object.entries(standardizedStructure || {}).filter(([_, fields]) => (
+              fields && typeof fields === 'object' && !Array.isArray(fields)
+            ));
+
+            // FeatureDropdown component for bottom sheet
+            const FeatureDropdown = ({ options, value, onChange, placeholder = 'Select...' }) => {
+              const [open, setOpen] = useState(false);
+              const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+              const [placement, setPlacement] = useState('bottom');
+              const triggerRef = useRef(null);
+              const containerRef = useRef(null);
+
+              const updatePosition = useCallback(() => {
+                const trigger = triggerRef.current;
+                if (!trigger) return;
+                const rect = trigger.getBoundingClientRect();
+                const viewportH = window.innerHeight;
+                const desiredHeight = Math.min(240, viewportH - rect.bottom - 16);
+                const openUpwards = desiredHeight < 160 && rect.top > viewportH / 2;
+                setPlacement(openUpwards ? 'top' : 'bottom');
+                setCoords({ top: openUpwards ? rect.top : rect.bottom, left: rect.left, width: rect.width });
+              }, []);
+
+              useEffect(() => {
+                const handleClickOutside = (e) => {
+                  if (containerRef.current && !containerRef.current.contains(e.target) && !triggerRef.current.contains(e.target)) {
+                    setOpen(false);
+                  }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                window.addEventListener('scroll', updatePosition, true);
+                window.addEventListener('resize', updatePosition);
+                return () => {
+                  document.removeEventListener('mousedown', handleClickOutside);
+                  window.removeEventListener('scroll', updatePosition, true);
+                  window.removeEventListener('resize', updatePosition);
+                };
+              }, [updatePosition]);
+
+              const formatLabel = (val) => {
+                if (!val) return placeholder;
+                return String(val).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              };
+
+              const handleSelect = (option) => {
+                onChange(option);
+                setOpen(false);
+              };
+
+              const dropdown = (
+                <div
+                  ref={containerRef}
+                  className={`feature-dd-portal ${placement}`}
+                  style={{
+                    position: 'fixed',
+                    top: coords.top + (placement === 'top' ? -8 : 8),
+                    left: coords.left,
+                    width: coords.width,
+                    zIndex: 9999,
+                  }}
+                >
+                  {options.map((option) => (
+                    <div
+                      key={option}
+                      className={`dropdown-option ${value === option ? 'selected' : ''}`}
+                      onClick={() => handleSelect(option)}
+                    >
+                      {formatLabel(option)}
+                    </div>
+                  ))}
+                </div>
+              );
+
+              return (
+                <div className="feature-dd">
+                  <button
+                    type="button"
+                    ref={triggerRef}
+                    className="field-select"
+                    onClick={() => {
+                      setOpen((v) => !v);
+                      if (!open) updatePosition();
+                    }}
+                    aria-haspopup="listbox"
+                    aria-expanded={open}
+                  >
+                    {formatLabel(value)}
+                  </button>
+                  {open ? createPortal(dropdown, document.body) : null}
+                </div>
+              );
+            };
+
+            // Masonry layout effect
+            useEffect(() => {
+              const container = document.querySelector('.bottom-sheet .all-features-content');
+              if (!container) return;
+
+              const sections = Array.from(container.children);
+              if (sections.length === 0) return;
+
+              // Sort sections alphabetically by category title
+              sections.sort((a, b) => {
+                const titleA = a.querySelector('.category-title')?.textContent || '';
+                const titleB = b.querySelector('.category-title')?.textContent || '';
+                return titleA.localeCompare(titleB);
+              });
+
+              // Reset positioning
+              sections.forEach(section => {
+                section.style.position = 'static';
+                section.style.top = 'auto';
+                section.style.left = 'auto';
+              });
+
+              // Calculate positions for masonry layout
+              const columns = 3;
+              const gap = 20; // Increased gap for better spacing
+              const columnHeights = new Array(columns).fill(0);
+              const columnWidth = (container.offsetWidth - gap * (columns - 1)) / columns;
+
+              sections.forEach((section, index) => {
+                // Place sections horizontally in alphabetical order
+                const columnIndex = index % columns;
+                const x = columnIndex * (columnWidth + gap);
+                const y = columnHeights[columnIndex];
+
+                section.style.position = 'absolute';
+                section.style.top = `${y}px`;
+                section.style.left = `${x}px`;
+                section.style.width = `${columnWidth}px`;
+
+                columnHeights[columnIndex] += section.offsetHeight + gap;
+              });
+
+              // Set container height to accommodate all items
+              const maxHeight = Math.max(...columnHeights);
+              container.style.height = `${maxHeight}px`;
+              container.style.position = 'relative';
+
+            }, [categories]);
+
+            return (
+              <div className="all-features-content">
+                {categories.map(([category, fields]) => {
+                  const formattedCategory = String(category)
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase())
+                    .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase());
+
+                  return (
+                    <div key={category} className="feature-category-section">
+                      <h4 className="category-title">{formattedCategory}</h4>
+                      <div className="category-fields">
+                        {Object.entries(fields).map(([fieldName, fieldOptions]) => {
+                          const currentValue = editedStructuredData?.[category]?.[fieldName] ?? '';
+                          return (
+                            <div key={fieldName} className="recommend-feature-item">
+                              <div className={`feature-row ${Array.isArray(fieldOptions) && fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no') ? 'checkbox-row' : ''}`}>
+                                <span className="feature-name">
+                                  {fieldName
+                                    .replace(/_/g, ' ')
+                                    .replace(/\b\w/g, l => l.toUpperCase())
+                                    .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase())
+                                  }
+                                </span>
+                                {Array.isArray(fieldOptions) ? (
+                                  <div className="feature-field">
+                                    {(fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no')) ? (
+                                      <input
+                                        type="checkbox"
+                                        className="field-checkbox"
+                                        checked={currentValue === 'yes'}
+                                        onChange={(e) => {
+                                          const newValue = e.target.checked ? 'yes' : 'no';
+                                          onChange(category, fieldName, newValue);
+                                        }}
+                                      />
+                                                                      ) : (
+                                    <FeatureDropdown
+                                      options={fieldOptions}
+                                      value={currentValue || ''}
+                                      onChange={(newValue) => {
+                                        onChange(category, fieldName, newValue);
+                                      }}
+                                    />
+                                  )}
+                                  </div>
+                                ) : (
+                                  <div className="feature-field">
+                                    <input
+                                      type="text"
+                                      value={currentValue}
+                                      onChange={(e) => onChange(category, fieldName, e.target.value)}
+                                      placeholder="Enter value"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
+
+          return (
+            <AllFeaturesRecommendStyle
+              standardizedStructure={standardizedStructure}
+              editedStructuredData={editedStructuredData}
+              onChange={handleFieldChange}
+            />
+          );
+        })()}
+      </BottomSheet>
     </div>
   );
 });

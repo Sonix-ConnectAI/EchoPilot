@@ -652,94 +652,9 @@
   opacity: 1;
 }
 
-/* PatientDataView Responsive video grid based on screen size */
-@media (min-width: 1920px) {
-  .patient-data-view .videos-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
 
-@media (max-width: 1440px) {
-  .patient-data-view .videos-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
 
-/* PatientDataView Responsive Design */
-@media (max-width: 1024px) {
-  .patient-data-view .main-content {
-    flex-direction: column;
-  }
-  
-  .patient-data-view .videos-area,
-  .patient-data-view .clinical-notes-area {
-    flex: 1;
-    min-height: 50%;
-  }
-  
-  .patient-data-view .videos-area {
-    border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  
-  .patient-data-view .clinical-notes-area {
-    flex-direction: column;
-    gap: 15px;
-  }
-  
-  .patient-data-view .videos-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
-  }
-}
 
-@media (max-width: 768px) {
-  .patient-data-view .page-header {
-    padding: 15px 20px;
-  }
-  
-  .patient-data-view .page-header h1 {
-    font-size: 20px;
-  }
-  
-  .patient-data-view .videos-container,
-  .patient-data-view .notes-content {
-    padding: 15px;
-  }
-  
-  .patient-data-view .videos-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-  }
-  
-  .patient-data-view .page-footer {
-    padding: 15px 20px;
-  }
-  
-  .patient-data-view .continue-button {
-    padding: 10px 20px;
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 480px) {
-  .patient-data-view .videos-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-  }
-  
-  .patient-data-view .main-content {
-    gap: 0;
-  }
-  
-  .patient-data-view .notes-section .section-header {
-    padding: 15px 20px 10px;
-  }
-  
-  .patient-data-view .notes-content {
-    padding: 15px 20px;
-  }
-}
 
 /* Performance optimizations */
 @media (prefers-reduced-motion: reduce) {
