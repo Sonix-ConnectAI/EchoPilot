@@ -14,6 +14,8 @@ Echopilot AI is a React app with a Node.js API, a WebSocket chat server, and an 
 ### Install
 ```bash
 npm install
+cd python_backend
+pip install -r requirements.txt
 ```
 
 ### Environment (optional)
