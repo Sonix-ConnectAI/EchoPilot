@@ -103,9 +103,9 @@ Helper:
 - Frontend external dev server: use `npm run dev:external`
 
 
-## 외부 실행 방법
+# 외부 실행 방법
 
-# .env 파일에서 다음 값들을 외부 IP로 변경
+## .env 파일에서 다음 값들을 외부 IP로 변경
 - HOST=0.0.0.0
 - REACT_APP_PYTHON_BACKEND_URL=http://10.10.21.59:5000
 - REACT_APP_API_URL=http://10.10.21.59:5001
@@ -124,7 +124,7 @@ Helper:
 
 ## local 실행 방법
  
-# 10.10.21.59 -> 127.0.0.1
+- 10.10.21.59 -> 127.0.0.1
 
 - python python_backend\start_server.py
 - npm run dev:complete
