@@ -543,12 +543,12 @@ def generate_struct_pred():
             return jsonify({"error": "Missing JSON data"}), 400
         
         # Resolve DB JSON path relative to project root, allow env override
-        db_json_path_env = os.environ.get('DB_JSON_PATH')
-        if db_json_path_env and db_json_path_env.strip():
-            db_json_path = db_json_path_env.strip()
-        else:
-            project_root = Path(__file__).resolve().parent.parent
-            db_json_path = str(project_root / 'DB_json' / 'eval_result-attn-50-3_local.json')
+        db_json_path_env = os.environ.get('REACT_APP_DB_JSON_PATH')
+
+        project_root = Path(__file__).resolve().parent.parent
+        print(project_root)
+        
+        db_json_path = str(project_root / 'public' / 'DB_json' / 'eval_result-attn-50-3_local.json')
         exam_id = data.get('exam_id')
         mode = data.get('mode', 'pred_label')
         

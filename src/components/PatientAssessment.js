@@ -7,6 +7,222 @@ import { npzToVideoUrl, cleanupVideoUrl } from '../utils/videoProcessor';
 import { getExamEntryById} from '../utils/dbUtils';
 import BottomSheet from './BottomSheet';
 
+// Hoisted: AllFeaturesRecommendStyle renders all-features-content without remounting on field edits
+const AllFeaturesRecommendStyle = memo(({ isOpen, editedStructuredData, onFieldChange }) => {
+  const categories = useMemo(() => (
+    Object.entries(standardizedStructure || {}).filter(([_, fields]) => (
+      fields && typeof fields === 'object' && !Array.isArray(fields)
+    ))
+  ), []);
+
+  // FeatureDropdown component for bottom sheet
+  const FeatureDropdown = memo(({ options, value, onChange, placeholder = 'Select...' }) => {
+    const [open, setOpen] = useState(false);
+    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+    const [placement, setPlacement] = useState('bottom');
+    const triggerRef = useRef(null);
+    const containerRef = useRef(null);
+
+    const updatePosition = useCallback(() => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const desiredHeight = Math.min(240, viewportH - rect.bottom - 16);
+      const openUpwards = desiredHeight < 160 && rect.top > viewportH / 2;
+      setPlacement(openUpwards ? 'top' : 'bottom');
+      setCoords({ top: openUpwards ? rect.top : rect.bottom, left: rect.left, width: rect.width });
+    }, []);
+
+    useEffect(() => {
+      const handleClickOutside = (e) => {
+        if (containerRef.current && !containerRef.current.contains(e.target) && !triggerRef.current.contains(e.target)) {
+          setOpen(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }, [updatePosition]);
+
+    const formatLabel = (val) => {
+      if (!val) return placeholder;
+      return String(val).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    };
+
+    const handleSelect = (option) => {
+      onChange(option);
+      setOpen(false);
+    };
+
+    const dropdown = (
+      <div
+        ref={containerRef}
+        className={`feature-dd-portal ${placement}`}
+        style={{
+          position: 'fixed',
+          top: coords.top + (placement === 'top' ? -8 : 8),
+          left: coords.left,
+          width: coords.width,
+          zIndex: 9999,
+        }}
+      >
+        {options.map((option) => (
+          <div
+            key={option}
+            className={`dropdown-option ${value === option ? 'selected' : ''}`}
+            onClick={() => handleSelect(option)}
+          >
+            {formatLabel(option)}
+          </div>
+        ))}
+      </div>
+    );
+
+    return (
+      <div className="feature-dd">
+        <button
+          type="button"
+          ref={triggerRef}
+          className="field-select"
+          onClick={() => {
+            setOpen((v) => !v);
+            if (!open) updatePosition();
+          }}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          {formatLabel(value)}
+        </button>
+        {open ? createPortal(dropdown, document.body) : null}
+      </div>
+    );
+  });
+
+  FeatureDropdown.displayName = 'FeatureDropdown';
+
+  // Masonry layout effect - only when BottomSheet opens or container size changes
+  useEffect(() => {
+    const container = document.querySelector('.bottom-sheet .all-features-content');
+    if (!container) return;
+
+    const sections = Array.from(container.children);
+    if (sections.length === 0) return;
+
+    // Sort sections alphabetically by category title
+    sections.sort((a, b) => {
+      const titleA = a.querySelector('.category-title')?.textContent || '';
+      const titleB = b.querySelector('.category-title')?.textContent || '';
+      return titleA.localeCompare(titleB);
+    });
+
+    // Reset positioning
+    sections.forEach(section => {
+      section.style.position = 'static';
+      section.style.top = 'auto';
+      section.style.left = 'auto';
+    });
+
+    // Calculate positions for masonry layout
+    const columns = 3;
+    const gap = 20;
+    const columnHeights = new Array(columns).fill(0);
+    const columnWidth = (container.offsetWidth - gap * (columns - 1)) / columns;
+
+    sections.forEach((section, index) => {
+      const columnIndex = index % columns;
+      const x = columnIndex * (columnWidth + gap);
+      const y = columnHeights[columnIndex];
+
+      section.style.position = 'absolute';
+      section.style.top = `${y}px`;
+      section.style.left = `${x}px`;
+      section.style.width = `${columnWidth}px`;
+
+      columnHeights[columnIndex] += section.offsetHeight + gap;
+    });
+
+    const maxHeight = Math.max(...columnHeights);
+    container.style.height = `${maxHeight}px`;
+    container.style.position = 'relative';
+
+  }, [isOpen]);
+
+  return (
+    <div className="all-features-content">
+      {categories.map(([category, fields]) => {
+        const formattedCategory = String(category)
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, l => l.toUpperCase())
+          .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase());
+
+        return (
+          <div key={category} className="feature-category-section">
+            <h4 className="category-title">{formattedCategory}</h4>
+            <div className="category-fields">
+              {Object.entries(fields).map(([fieldName, fieldOptions]) => {
+                const currentValue = editedStructuredData?.[category]?.[fieldName] ?? '';
+                return (
+                  <div key={fieldName} className="recommend-feature-item">
+                    <div className={`feature-row ${Array.isArray(fieldOptions) && fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no') ? 'checkbox-row' : ''}`}>
+                      <span className="feature-name">
+                        {fieldName
+                          .replace(/_/g, ' ')
+                          .replace(/\b\w/g, l => l.toUpperCase())
+                          .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase())
+                        }
+                      </span>
+                      {Array.isArray(fieldOptions) ? (
+                        <div className="feature-field">
+                          {(fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no')) ? (
+                            <input
+                              type="checkbox"
+                              className="field-checkbox"
+                              checked={currentValue === 'yes'}
+                              onChange={(e) => {
+                                const newValue = e.target.checked ? 'yes' : 'no';
+                                onFieldChange(category, fieldName, newValue);
+                              }}
+                            />
+                          ) : (
+                            <FeatureDropdown
+                              options={fieldOptions}
+                              value={currentValue || ''}
+                              onChange={(newValue) => {
+                                onFieldChange(category, fieldName, newValue);
+                              }}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="feature-field">
+                          <input
+                            type="text"
+                            value={currentValue}
+                            onChange={(e) => onFieldChange(category, fieldName, e.target.value)}
+                            placeholder="Enter value"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+});
+
+AllFeaturesRecommendStyle.displayName = 'AllFeaturesRecommendStyle';
+
 // Standardized structure for all patient data fields
 const standardizedStructure = {
   // ----------------------------- General -----------------------------
@@ -256,20 +472,15 @@ const standardizedStructure_measure = {
 };
 
 // DetailEditor Component for editing patient data - Memoized for performance
-const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, externalEdit, onEditedDataChange, onFieldChange, onHandlersReady }) => {
+const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, onHandlersReady }) => {
   const [editedStructuredData, setEditedStructuredData] = useState(structuredData || {});
   const [originalStructuredData, setOriginalStructuredData] = useState(structuredData || {});
   const [hasChanges, setHasChanges] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const lastExternalEditRef = useRef(null);
-  
   // Keep local state in sync when parent provides/updates structuredData
   useEffect(() => {
     setEditedStructuredData(structuredData || {});
     setOriginalStructuredData(structuredData || {});
-    
-
-    
     setHasChanges(false);
   }, [structuredData, patientData]);
 
@@ -288,26 +499,6 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
     }
   }, [structuredData, hasChanges]);
 
-  // Apply external edit from parent (top-bar dropdown bridge)
-  useEffect(() => {
-    if (!externalEdit || !externalEdit.category || !externalEdit.field) return;
-    const key = JSON.stringify(externalEdit);
-    if (lastExternalEditRef.current === key) return; // prevent re-applying same edit
-
-    const { category, field, value } = externalEdit;
-    const current = (editedStructuredData?.[category] || {})[field];
-    if (current !== value) {
-      handleFieldChange(category, field, value);
-    }
-    lastExternalEditRef.current = key;
-  }, [externalEdit, editedStructuredData]);
-
-  // Notify parent component when editedStructuredData changes
-  useEffect(() => {
-    if (onEditedDataChange) {
-      onEditedDataChange(editedStructuredData);
-    }
-  }, [editedStructuredData, onEditedDataChange]);
 
   // Handle field changes
   const handleFieldChange = (category, field, value) => {
@@ -331,12 +522,18 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
       }));
     }
     setHasChanges(true);
-    
-    // Notify parent component if onFieldChange is provided
-    if (onFieldChange) {
-      onFieldChange(category, field, value);
-    }
   };
+
+  // Bridge: listen to external field changes from AllFeaturesRecommendStyle
+  useEffect(() => {
+    const handler = (e) => {
+      const { category, field, value } = e.detail || {};
+      if (!category || !field) return;
+      handleFieldChange(category, field, value);
+    };
+    window.addEventListener('detailEditorFieldChange', handler);
+    return () => window.removeEventListener('detailEditorFieldChange', handler);
+  }, [handleFieldChange]);
 
   // Handle numeric field changes
   const handleNumericChange = (category, field, value) => {
@@ -401,8 +598,8 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
 
   // Reset to original
   const handleReset = useCallback(() => {
-    setEditedStructuredData(structuredData || {});
-    setOriginalStructuredData(structuredData || {});
+      setEditedStructuredData(structuredData || {});
+      setOriginalStructuredData(structuredData || {});
     setHasChanges(false);
   }, [structuredData]);
 
@@ -623,27 +820,27 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
     } else {
       // If no keyword is selected, show all features from all keywords
       // This ensures all key_feature items are visible
-      const allKeyFeatures = new Set();
-      summaryKeywords.forEach(kw => {
-        const byCat = kw.key_feature_by_category || {};
-        Object.keys(byCat).forEach(cat => {
-          const arr = byCat[cat] || [];
-          arr.forEach(f => allKeyFeatures.add(pairKey(cat, f)));
-        });
-      });
-      
-      // Add any missing features from key_feature that might not be in keyFeatureMap
-      allKeyFeatures.forEach(key => {
-        const [cat, field] = key.split('::');
-        if (!recommendedFeatures.find(f => f.feature === field && f.category === cat)) {
-          recommendedFeatures.push({
-            feature: field,
-            importance: 3,
-            category: cat,
-            term: field
+        const allKeyFeatures = new Set();
+        summaryKeywords.forEach(kw => {
+          const byCat = kw.key_feature_by_category || {};
+          Object.keys(byCat).forEach(cat => {
+            const arr = byCat[cat] || [];
+            arr.forEach(f => allKeyFeatures.add(pairKey(cat, f)));
           });
-        }
-      });
+        });
+        
+        // Add any missing features from key_feature that might not be in keyFeatureMap
+        allKeyFeatures.forEach(key => {
+          const [cat, field] = key.split('::');
+          if (!recommendedFeatures.find(f => f.feature === field && f.category === cat)) {
+            recommendedFeatures.push({
+              feature: field,
+              importance: 3,
+              category: cat,
+              term: field
+            });
+          }
+        });
     }
     
     if (recommendedFeatures.length === 0) return null;
@@ -668,10 +865,10 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
             let found = false;
             Object.entries(standardizedStructure).forEach(([cat, fields]) => {
               if (typeof fields === 'object' && !Array.isArray(fields) && fields[item.feature]) {
-                fieldCategory = cat;
-                currentValue = editedStructuredData[cat]?.[item.feature];
-                fieldOptions = fields[item.feature];
-                found = true;
+                  fieldCategory = cat;
+                  currentValue = editedStructuredData[cat]?.[item.feature];
+                  fieldOptions = fields[item.feature];
+                  found = true;
               }
             });
             
@@ -681,10 +878,10 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
                 if (typeof fields === 'object' && !Array.isArray(fields)) {
                   Object.keys(fields).forEach(fieldName => {
                     if (fieldName.toLowerCase() === item.feature.toLowerCase()) {
-                      fieldCategory = cat;
-                      currentValue = editedStructuredData[cat]?.[fieldName];
-                      fieldOptions = fields[fieldName];
-                      found = true;
+                        fieldCategory = cat;
+                        currentValue = editedStructuredData[cat]?.[fieldName];
+                        fieldOptions = fields[fieldName];
+                        found = true;
                     }
                   });
                 }
@@ -697,13 +894,13 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
                 if (typeof fields === 'object' && !Array.isArray(fields)) {
                   Object.entries(fields).forEach(([fieldName, fieldValues]) => {
                     if (Array.isArray(fieldValues) && fieldValues.includes(item.feature)) {
-                      // This is a field value, not a field name
-                      fieldCategory = cat;
-                      currentValue = editedStructuredData[cat]?.[fieldName];
-                      fieldOptions = fieldValues;
-                      found = true;
-                      // Update the feature name to the actual field name
-                      item.feature = fieldName;
+                        // This is a field value, not a field name
+                        fieldCategory = cat;
+                        currentValue = editedStructuredData[cat]?.[fieldName];
+                        fieldOptions = fieldValues;
+                        found = true;
+                        // Update the feature name to the actual field name
+                        item.feature = fieldName;
                     }
                   });
                 }
@@ -895,6 +1092,194 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
     return measurements;
   };
 
+  // AllFeaturesRecommendStyle Component - removed (hoisted to top-level)
+
+  // Top Header Dropdowns Component - Inside DetailEditor for direct editedStructuredData access
+  const TopHeaderDropdowns = memo(({ isImageQualityOpen, setIsImageQualityOpen, isCardiacRhythmOpen, setIsCardiacRhythmOpen, onShowDetailPanel }) => {
+    return (
+      <div className="header-dropdowns-container">
+        {/* Image Quality Dropdown */}
+        <div className="dropdown-card">
+          <div className="dropdown-header">
+            <span className="dropdown-label">Image Quality</span>
+          </div>
+          <div 
+            className="dropdown-trigger"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsImageQualityOpen(!isImageQualityOpen);
+            }}
+          >
+            <span className="dropdown-value">
+              {(editedStructuredData?.image_quality?.image_quality) === 'normal' ? 'Normal' : 'Poor'}
+            </span>
+            <div className={`dropdown-icon ${isImageQualityOpen ? 'open' : ''}`}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M4 6l4 4 4-4" stroke="#FFFFFF" strokeWidth="2" fill="none"/>
+              </svg>
+            </div>
+          </div>
+          {isImageQualityOpen && (
+            <div className="dropdown-options">
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.image_quality?.image_quality) === 'normal' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsImageQualityOpen(false);
+                  handleFieldChange('image_quality', 'image_quality', 'normal');
+                  onShowDetailPanel();
+                }}
+              >
+                Normal
+              </div>
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.image_quality?.image_quality) === 'poor' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsImageQualityOpen(false);
+                  handleFieldChange('image_quality', 'image_quality', 'poor');
+                  onShowDetailPanel();
+                }}
+              >
+                Poor
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Cardiac Rhythm Dropdown */}
+        <div className="dropdown-card">
+          <div className="dropdown-header">
+            <span className="dropdown-label">Cardiac Rhythm</span>
+          </div>
+          <div 
+            className="dropdown-trigger"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCardiacRhythmOpen(!isCardiacRhythmOpen);
+            }}
+          >
+            <span className="dropdown-value">
+              {(() => {
+                const rhythm = editedStructuredData?.cardiac_rhythm;
+                return rhythm?.cardiac_rhythm === 'normal' ? 'Normal' : 
+                       rhythm?.cardiac_rhythm === 'atrial_fibrillation' ? 'Atrial Fibrillation' :
+                       rhythm?.cardiac_rhythm === 'atrial_flutter' ? 'Atrial Flutter' :
+                       rhythm?.cardiac_rhythm === 'ventricular_premature_beat' ? 'Ventricular Premature Beat' :
+                       rhythm?.cardiac_rhythm === 'atrial_premature_beat' ? 'Atrial Premature Beat' :
+                       rhythm?.cardiac_rhythm === 'paced_rhythm' ? 'Paced Rhythm' :
+                       rhythm?.cardiac_rhythm === 'other' ? 'Other' : 'Normal';
+              })()}
+            </span>
+            <div className={`dropdown-icon ${isCardiacRhythmOpen ? 'open' : ''}`}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M4 6l4 4 4-4" stroke="#FFFFFF" strokeWidth="2" fill="none"/>
+              </svg>
+            </div>
+          </div>
+          {isCardiacRhythmOpen && (
+            <div className="dropdown-options">
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'normal' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCardiacRhythmOpen(false);
+                  handleFieldChange('cardiac_rhythm', 'cardiac_rhythm', 'normal');
+                  onShowDetailPanel();
+                }}
+              >
+                Normal
+              </div>
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_fibrillation' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCardiacRhythmOpen(false);
+                  handleFieldChange('cardiac_rhythm', 'cardiac_rhythm', 'atrial_fibrillation');
+                  onShowDetailPanel();
+                }}
+              >
+                Atrial Fibrillation
+              </div>
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_flutter' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCardiacRhythmOpen(false);
+                  handleFieldChange('cardiac_rhythm', 'cardiac_rhythm', 'atrial_flutter');
+                  onShowDetailPanel();
+                }}
+              >
+                Atrial Flutter
+              </div>
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'ventricular_premature_beat' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCardiacRhythmOpen(false);
+                  handleFieldChange('cardiac_rhythm', 'cardiac_rhythm', 'ventricular_premature_beat');
+                  onShowDetailPanel();
+                }}
+              >
+                Ventricular Premature Beat
+              </div>
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_premature_beat' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCardiacRhythmOpen(false);
+                  handleFieldChange('cardiac_rhythm', 'cardiac_rhythm', 'atrial_premature_beat');
+                  onShowDetailPanel();
+                }}
+              >
+                Atrial Premature Beat
+              </div>
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'paced_rhythm' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCardiacRhythmOpen(false);
+                  handleFieldChange('cardiac_rhythm', 'cardiac_rhythm', 'paced_rhythm');
+                  onShowDetailPanel();
+                }}
+              >
+                Paced Rhythm
+              </div>
+              <div 
+                className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'other' ? 'selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCardiacRhythmOpen(false);
+                  handleFieldChange('cardiac_rhythm', 'cardiac_rhythm', 'other');
+                  onShowDetailPanel();
+                }}
+              >
+                Other
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  });
+
+  TopHeaderDropdowns.displayName = 'TopHeaderDropdowns';
+
+  // Expose handlers and edited data only (no component references)
+  useEffect(() => {
+    if (onHandlersReady) {
+      onHandlersReady({
+        handleApply,
+        handleCancel,
+        handleReset,
+        hasChanges,
+        isGeneratingSummary,
+        TopHeaderDropdowns,
+        editedStructuredData
+      });
+    }
+  }, [onHandlersReady, hasChanges, isGeneratingSummary, editedStructuredData]);
+
   return (
     <div className="detail-editor">
       <div className="editor-two-column">
@@ -962,6 +1347,7 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
 
 DetailEditor.displayName = 'DetailEditor';
 
+
 // Memoized Line component for efficient summary rendering
 const SummaryLine = memo(({ line, sentenceNumber, makeTextClickable }) => {
   return (
@@ -995,10 +1381,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [keywordVideos, setKeywordVideos] = useState([]);
   const [showingVideos, setShowingVideos] = useState(false);
   const [selectedVideoCategory, setSelectedVideoCategory] = useState('all');
-  // External edit bridge: top-bar dropdown -> DetailEditor editedStructuredData
-  const [externalEdit, setExternalEdit] = useState(null);
-  // Local edited data state for dropdown display
-  const [editedStructuredData, setEditedStructuredData] = useState(structuredData || {});
   const [availableCategories, setAvailableCategories] = useState([]);
   const [allVideosData, setAllVideosData] = useState([]);
   const [expandedVideo, setExpandedVideo] = useState(null);
@@ -1046,21 +1428,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [isCardiacRhythmOpen, setIsCardiacRhythmOpen] = useState(false);
   const [isAllFeaturesOpen, setIsAllFeaturesOpen] = useState(false);
 
-  // Handle field changes for both DetailEditor and BottomSheet
-  const handleFieldChange = useCallback((category, field, value) => {
-    setEditedStructuredData(prev => ({
-      ...prev,
-      [category]: {
-        ...(prev[category] || {}),
-        [field]: value
-      }
-    }));
-  }, []);
-
-  // Sync editedStructuredData when structuredData changes
-  useEffect(() => {
-    setEditedStructuredData(structuredData || {});
-  }, [structuredData]);
   
 
 
@@ -1336,7 +1703,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   // Function to handle keyword extraction
   const handleKeywordExtraction = async (summaryText) => {
     try {
-      setIsExtractingKeywords(true);
+        setIsExtractingKeywords(true);
       setKeywordErr(null);
       
       const result = await extractKeywordsFromSummary(
@@ -1359,7 +1726,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       setSummaryKeywords([]);
       return [];
     } finally {
-      setIsExtractingKeywords(false);
+        setIsExtractingKeywords(false);
     }
   };
 
@@ -1674,7 +2041,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
 
   // Filter videos based on keyword category and view_attention
-  const filterVideosByKeyword = (keywordObj) => {
+  const filterVideosByKeyword = (keywordObj) => {    
     if (!allVideosData || allVideosData.length === 0) {
       console.log('❌ No video data available');
       return [];
@@ -1700,7 +2067,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     }
     
     // Remove duplicates
-    categories = [...new Set(categories)];
+    categories = [...new Set(categories)];    
     
     console.log('🔍 Filtering videos for categories:', categories);
     console.log('📊 Total videos available:', allVideosData.length);
@@ -1816,7 +2183,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     
     // Parse uniqueId format: sentence_number::normalized_keyword
     const [sentenceNumStr, normalizedKeyword] = uniqueId.split('::');
-    const sentenceNumber = parseInt(sentenceNumStr);
+    const sentenceNumber = parseInt(sentenceNumStr);    
     
     // Resolve keyword using sentence + normalized text
     const keywordObj = resolveKeyword(sentenceNumber, normalizedKeyword);
@@ -2510,14 +2877,14 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       if (Array.isArray(views)) {
         views.forEach(viewData => {
           if (viewData && typeof viewData === 'object' && viewData.weight > 0) {
-            allVideos.push({
-              category: category,
-              viewIdx: viewData.view_idx,
-              viewLabel: viewData.view_lbl,
-              weight: viewData.weight,
-              fname: viewData.fname,
-              isRelevant: keywordCategories.includes(category)
-            });
+          allVideos.push({
+            category: category,
+            viewIdx: viewData.view_idx,
+            viewLabel: viewData.view_lbl,
+            weight: viewData.weight,
+            fname: viewData.fname,
+            isRelevant: keywordCategories.includes(category)
+          });
           }
         });
       }
@@ -2670,7 +3037,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     }
     
     // If we don't have enough videos from the specific categories, add videos from other categories
-    if (uniqueVideos.length < 6) {
+    if (uniqueVideos.length < 6) {      
       console.log('⚠️ Not enough videos from specific categories, adding from other categories...');
       
       // Get videos from other categories
@@ -3255,166 +3622,18 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
           {/* Right side controls container */}
           <div className="right-controls-container">
-            {/* Image Quality Dropdown (top bar -> DetailEditor bridge) */}
-            <div className="dropdown-card">
-              <span className="dropdown-label">Image Quality</span>
-              <div 
-                className="dropdown-content"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsImageQualityOpen(!isImageQualityOpen);
-                }}
-              >
-                <span className="dropdown-value">
-                  {(editedStructuredData?.image_quality?.image_quality) === 'normal' ? 'Normal' : 'Poor'}
-                </span>
-                <div className={`dropdown-icon ${isImageQualityOpen ? 'open' : ''}`}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M4 6l4 4 4-4" stroke="#FFFFFF" strokeWidth="2" fill="none"/>
-                  </svg>
-                </div>
-              </div>
-              {isImageQualityOpen && (
-                <div className="dropdown-options">
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.image_quality?.image_quality) === 'normal' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsImageQualityOpen(false);
-                      // Bridge to DetailEditor edit state
-                      setExternalEdit({ category: 'image_quality', field: 'image_quality', value: 'normal' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Normal
-                  </div>
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.image_quality?.image_quality) === 'poor' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsImageQualityOpen(false);
-                      // Bridge to DetailEditor edit state
-                      setExternalEdit({ category: 'image_quality', field: 'image_quality', value: 'poor' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Poor
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Cardiac Rhythm Dropdown (top bar -> DetailEditor bridge) */}
-            <div className="dropdown-card">
-              <span className="dropdown-label">Cardiac Rhythm</span>
-              <div 
-                className="dropdown-content"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsCardiacRhythmOpen(!isCardiacRhythmOpen);
-                }}
-              >
-                                  <span className="dropdown-value">
-                                          {(() => {
-                        const rhythm = editedStructuredData?.cardiac_rhythm;
-                       
-
-                        return rhythm?.cardiac_rhythm === 'normal' ? 'Normal' : 
-                               rhythm?.cardiac_rhythm === 'atrial_fibrillation' ? 'Atrial Fibrillation' :
-                               rhythm?.cardiac_rhythm === 'atrial_flutter' ? 'Atrial Flutter' :
-                               rhythm?.cardiac_rhythm === 'ventricular_premature_beat' ? 'Ventricular Premature Beat' :
-                               rhythm?.cardiac_rhythm === 'atrial_premature_beat' ? 'Atrial Premature Beat' :
-                               rhythm?.cardiac_rhythm === 'paced_rhythm' ? 'Paced Rhythm' : 'Other';
-                      })()}
-                  </span>
-                <div className={`dropdown-icon ${isCardiacRhythmOpen ? 'open' : ''}`}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M4 6l4 4 4-4" stroke="#FFFFFF" strokeWidth="2" fill="none"/>
-                  </svg>
-                </div>
-              </div>
-              {isCardiacRhythmOpen && (
-                <div className="dropdown-options">
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'normal' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsCardiacRhythmOpen(false);
-                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'normal' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Normal
-                  </div>
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_fibrillation' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsCardiacRhythmOpen(false);
-                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'atrial_fibrillation' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Atrial Fibrillation
-                  </div>
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_flutter' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsCardiacRhythmOpen(false);
-                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'atrial_flutter' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Atrial Flutter
-                  </div>
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'ventricular_premature_beat' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsCardiacRhythmOpen(false);
-                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'ventricular_premature_beat' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Ventricular Premature Beat
-                  </div>
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'atrial_premature_beat' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsCardiacRhythmOpen(false);
-                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'atrial_premature_beat' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Atrial Premature Beat
-                  </div>
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'paced_rhythm' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsCardiacRhythmOpen(false);
-                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'paced_rhythm' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Paced Rhythm
-                  </div>
-                  <div 
-                    className={`dropdown-option ${(editedStructuredData?.cardiac_rhythm?.cardiac_rhythm) === 'other' ? 'selected' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsCardiacRhythmOpen(false);
-                      setExternalEdit({ category: 'cardiac_rhythm', field: 'cardiac_rhythm', value: 'other' });
-                      setShowDetailPanel(true);
-                    }}
-                  >
-                    Other
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Header Dropdowns */}
+            {editorHandlers?.TopHeaderDropdowns ? (
+              <editorHandlers.TopHeaderDropdowns 
+                isImageQualityOpen={isImageQualityOpen}
+                setIsImageQualityOpen={setIsImageQualityOpen}
+                isCardiacRhythmOpen={isCardiacRhythmOpen}
+                setIsCardiacRhythmOpen={setIsCardiacRhythmOpen}
+                onShowDetailPanel={() => setShowDetailPanel(true)}
+              />
+            ) : (
+              <div>Loading...</div>
+            )}
 
             {/* End Exam Button */}
             <div className="end-exam-button" onClick={() => {
@@ -3866,16 +4085,13 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                   selectedKeyword={selectedKeyword}
                   resolveKeyword={resolveKeyword}
                   mapFeatureToField={mapFeatureToField}
-                  externalEdit={externalEdit}
-                  onEditedDataChange={setEditedStructuredData}
-                  onFieldChange={handleFieldChange}
                   onHandlersReady={setEditorHandlers}
                 />
               )}
           </div>
           
           {/* All Features Button */}
-          {/* <div className="edit-all-features-trigger">
+          <div className="edit-all-features-trigger">
             <button 
               className="edit-all-features-button"
               onClick={() => setIsAllFeaturesOpen(true)}
@@ -3886,7 +4102,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               </svg>
               <span>All Features</span>
             </button>
-          </div> */}
+          </div>
         </div>
       </div>
       
@@ -3974,7 +4190,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               className="btn-cancel"
               onClick={() => {
                 editorHandlers?.handleCancel();
-                setIsAllFeaturesOpen(false);
               }}
               disabled={!editorHandlers?.hasChanges || editorHandlers?.isGeneratingSummary}
             >
@@ -3992,227 +4207,16 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         title="All Features"
         height="100%"
       >
-        {/* Helper: All Features (Recommend-style) */}
-        {(() => {
-          const AllFeaturesRecommendStyle = ({ standardizedStructure, editedStructuredData, onChange }) => {
-            const categories = Object.entries(standardizedStructure || {}).filter(([_, fields]) => (
-              fields && typeof fields === 'object' && !Array.isArray(fields)
-            ));
-
-            // FeatureDropdown component for bottom sheet
-            const FeatureDropdown = ({ options, value, onChange, placeholder = 'Select...' }) => {
-              const [open, setOpen] = useState(false);
-              const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
-              const [placement, setPlacement] = useState('bottom');
-              const triggerRef = useRef(null);
-              const containerRef = useRef(null);
-
-              const updatePosition = useCallback(() => {
-                const trigger = triggerRef.current;
-                if (!trigger) return;
-                const rect = trigger.getBoundingClientRect();
-                const viewportH = window.innerHeight;
-                const desiredHeight = Math.min(240, viewportH - rect.bottom - 16);
-                const openUpwards = desiredHeight < 160 && rect.top > viewportH / 2;
-                setPlacement(openUpwards ? 'top' : 'bottom');
-                setCoords({ top: openUpwards ? rect.top : rect.bottom, left: rect.left, width: rect.width });
-              }, []);
-
-              useEffect(() => {
-                const handleClickOutside = (e) => {
-                  if (containerRef.current && !containerRef.current.contains(e.target) && !triggerRef.current.contains(e.target)) {
-                    setOpen(false);
-                  }
-                };
-                document.addEventListener('mousedown', handleClickOutside);
-                window.addEventListener('scroll', updatePosition, true);
-                window.addEventListener('resize', updatePosition);
-                return () => {
-                  document.removeEventListener('mousedown', handleClickOutside);
-                  window.removeEventListener('scroll', updatePosition, true);
-                  window.removeEventListener('resize', updatePosition);
-                };
-              }, [updatePosition]);
-
-              const formatLabel = (val) => {
-                if (!val) return placeholder;
-                return String(val).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-              };
-
-              const handleSelect = (option) => {
-                onChange(option);
-                setOpen(false);
-              };
-
-              const dropdown = (
-                <div
-                  ref={containerRef}
-                  className={`feature-dd-portal ${placement}`}
-                  style={{
-                    position: 'fixed',
-                    top: coords.top + (placement === 'top' ? -8 : 8),
-                    left: coords.left,
-                    width: coords.width,
-                    zIndex: 9999,
-                  }}
-                >
-                  {options.map((option) => (
-                    <div
-                      key={option}
-                      className={`dropdown-option ${value === option ? 'selected' : ''}`}
-                      onClick={() => handleSelect(option)}
-                    >
-                      {formatLabel(option)}
-                    </div>
-                  ))}
-                </div>
-              );
-
-              return (
-                <div className="feature-dd">
-                  <button
-                    type="button"
-                    ref={triggerRef}
-                    className="field-select"
-                    onClick={() => {
-                      setOpen((v) => !v);
-                      if (!open) updatePosition();
-                    }}
-                    aria-haspopup="listbox"
-                    aria-expanded={open}
-                  >
-                    {formatLabel(value)}
-                  </button>
-                  {open ? createPortal(dropdown, document.body) : null}
-                </div>
-              );
-            };
-
-            // Masonry layout effect
-            useEffect(() => {
-              const container = document.querySelector('.bottom-sheet .all-features-content');
-              if (!container) return;
-
-              const sections = Array.from(container.children);
-              if (sections.length === 0) return;
-
-              // Sort sections alphabetically by category title
-              sections.sort((a, b) => {
-                const titleA = a.querySelector('.category-title')?.textContent || '';
-                const titleB = b.querySelector('.category-title')?.textContent || '';
-                return titleA.localeCompare(titleB);
-              });
-
-              // Reset positioning
-              sections.forEach(section => {
-                section.style.position = 'static';
-                section.style.top = 'auto';
-                section.style.left = 'auto';
-              });
-
-              // Calculate positions for masonry layout
-              const columns = 3;
-              const gap = 20; // Increased gap for better spacing
-              const columnHeights = new Array(columns).fill(0);
-              const columnWidth = (container.offsetWidth - gap * (columns - 1)) / columns;
-
-              sections.forEach((section, index) => {
-                // Place sections horizontally in alphabetical order
-                const columnIndex = index % columns;
-                const x = columnIndex * (columnWidth + gap);
-                const y = columnHeights[columnIndex];
-
-                section.style.position = 'absolute';
-                section.style.top = `${y}px`;
-                section.style.left = `${x}px`;
-                section.style.width = `${columnWidth}px`;
-
-                columnHeights[columnIndex] += section.offsetHeight + gap;
-              });
-
-              // Set container height to accommodate all items
-              const maxHeight = Math.max(...columnHeights);
-              container.style.height = `${maxHeight}px`;
-              container.style.position = 'relative';
-
-            }, [categories]);
-
-            return (
-              <div className="all-features-content">
-                {categories.map(([category, fields]) => {
-                  const formattedCategory = String(category)
-                    .replace(/_/g, ' ')
-                    .replace(/\b\w/g, l => l.toUpperCase())
-                    .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase());
-
-                  return (
-                    <div key={category} className="feature-category-section">
-                      <h4 className="category-title">{formattedCategory}</h4>
-                      <div className="category-fields">
-                        {Object.entries(fields).map(([fieldName, fieldOptions]) => {
-                          const currentValue = editedStructuredData?.[category]?.[fieldName] ?? '';
-                          return (
-                            <div key={fieldName} className="recommend-feature-item">
-                              <div className={`feature-row ${Array.isArray(fieldOptions) && fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no') ? 'checkbox-row' : ''}`}>
-                                <span className="feature-name">
-                                  {fieldName
-                                    .replace(/_/g, ' ')
-                                    .replace(/\b\w/g, l => l.toUpperCase())
-                                    .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase())
-                                  }
-                                </span>
-                                {Array.isArray(fieldOptions) ? (
-                                  <div className="feature-field">
-                                    {(fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no')) ? (
-                                      <input
-                                        type="checkbox"
-                                        className="field-checkbox"
-                                        checked={currentValue === 'yes'}
-                                        onChange={(e) => {
-                                          const newValue = e.target.checked ? 'yes' : 'no';
-                                          onChange(category, fieldName, newValue);
-                                        }}
-                                      />
-                                                                      ) : (
-                                    <FeatureDropdown
-                                      options={fieldOptions}
-                                      value={currentValue || ''}
-                                      onChange={(newValue) => {
-                                        onChange(category, fieldName, newValue);
-                                      }}
-                                    />
-                                  )}
-                                  </div>
-                                ) : (
-                                  <div className="feature-field">
-                                    <input
-                                      type="text"
-                                      value={currentValue}
-                                      onChange={(e) => onChange(category, fieldName, e.target.value)}
-                                      placeholder="Enter value"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          };
-
-          return (
-            <AllFeaturesRecommendStyle
-              standardizedStructure={standardizedStructure}
-              editedStructuredData={editedStructuredData}
-              onChange={handleFieldChange}
-            />
-          );
-        })()}
+        <AllFeaturesRecommendStyle
+          isOpen={isAllFeaturesOpen}
+          editedStructuredData={editorHandlers?.editedStructuredData}
+          onFieldChange={(category, field, value) => {
+            // delegate to DetailEditor via editorHandlers by dispatching a synthetic change through structuredData merge
+            // We rely on DetailEditor owning the state change through its public handlers when Apply/Cancel/Reset; live edits update local state there.
+            // For live editing, we expose a lightweight event through window to avoid passing unstable functions.
+            window.dispatchEvent(new CustomEvent('detailEditorFieldChange', { detail: { category, field, value } }));
+          }}
+        />
       </BottomSheet>
     </div>
   );
