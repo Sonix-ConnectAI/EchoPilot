@@ -472,7 +472,7 @@ const standardizedStructure_measure = {
 };
 
 // DetailEditor Component for editing patient data - Memoized for performance
-const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, onHandlersReady }) => {
+const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, onHandlersReady }) => {
   const [editedStructuredData, setEditedStructuredData] = useState(structuredData || {});
   const [originalStructuredData, setOriginalStructuredData] = useState(structuredData || {});
   const [hasChanges, setHasChanges] = useState(false);
@@ -598,10 +598,17 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
 
   // Reset to original
   const handleReset = useCallback(() => {
-      setEditedStructuredData(structuredData || {});
-      setOriginalStructuredData(structuredData || {});
-    setHasChanges(false);
-  }, [structuredData]);
+      // Rebuild from pristine patient baseline
+      const rebuilt = structurePatientData(baselinePatientData || patientData || {});
+      setEditedStructuredData(rebuilt || {});
+      setOriginalStructuredData(rebuilt || {});
+      setHasChanges(false);
+
+      // Also notify parent to restore baseline summary/keywords immediately (no regeneration)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('detailEditorResetToBaseline'));
+      }
+  }, [baselinePatientData, patientData]);
 
   // Memoize handlers to prevent infinite loops
   const memoizedHandlers = useMemo(() => ({
@@ -766,6 +773,9 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
     );
   };
 
+  // Persist last shown recommended features to keep UI stable across refreshes
+  const lastRecommendedFeaturesRef = useRef([]);
+
   // Render Recommend Feature section
   const renderRecommendFeatureSection = () => {
     if (!summaryKeywords || summaryKeywords.length === 0) return null;
@@ -816,10 +826,18 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
         });
         recommendedFeatures = recommendedFeatures.filter(f => allow.has(pairKey(f.category, f.feature)));
         // Keep original order defined above (importance/order)
+      } else {
+        // If selected keyword cannot be resolved (e.g., after refresh), fallback to last shown list
+        if (lastRecommendedFeaturesRef.current && lastRecommendedFeaturesRef.current.length > 0) {
+          recommendedFeatures = [...lastRecommendedFeaturesRef.current];
+        }
       }
     } else {
-      // If no keyword is selected, show all features from all keywords
-      // This ensures all key_feature items are visible
+      // If no keyword is selected, prefer showing the last displayed list
+      if (lastRecommendedFeaturesRef.current && lastRecommendedFeaturesRef.current.length > 0) {
+        recommendedFeatures = [...lastRecommendedFeaturesRef.current];
+      } else {
+        // Otherwise, show all features from all keywords
         const allKeyFeatures = new Set();
         summaryKeywords.forEach(kw => {
           const byCat = kw.key_feature_by_category || {};
@@ -828,7 +846,6 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
             arr.forEach(f => allKeyFeatures.add(pairKey(cat, f)));
           });
         });
-        
         // Add any missing features from key_feature that might not be in keyFeatureMap
         allKeyFeatures.forEach(key => {
           const [cat, field] = key.split('::');
@@ -841,8 +858,13 @@ const DetailEditor = memo(({ structuredData, patientData, onUpdate, onClose, sel
             });
           }
         });
+      }
     }
-    
+    // Persist current non-empty list for future fallback
+    if (recommendedFeatures.length > 0) {
+      lastRecommendedFeaturesRef.current = recommendedFeatures;
+    }
+
     if (recommendedFeatures.length === 0) return null;
     
     return (
@@ -1362,6 +1384,7 @@ SummaryLine.displayName = 'SummaryLine';
 const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [patientData, setPatientData] = useState(patient);
   const [summary, setSummary] = useState('');
+  const baselineSummaryRef = useRef(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [videoSegments, setVideoSegments] = useState([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
@@ -1370,6 +1393,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [structuredData, setStructuredData] = useState(null);
   const [selectedBlockType, setSelectedBlockType] = useState(null);
   const [summaryKeywords, setSummaryKeywords] = useState([]);
+  const baselineKeywordsRef = useRef(null);
   const [isExtractingKeywords, setIsExtractingKeywords] = useState(false);
   const [keywordErr, setKeywordErr] = useState(null);
   const [tooltipData, setTooltipData] = useState(null);
@@ -1591,11 +1615,25 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   
   // Helper function to resolve keyword by sentence + normalized text
   const resolveKeyword = useCallback((sentenceNumber, normalizedKeyword) => {
+    // Case-sensitive normalize helper for keyword resolution (preserves case)
+    const normalizeForResolve = (str) => {
+      if (!str) return '';
+      return str
+        .normalize('NFKC')
+        .replace(/\u00A0/g, ' ') // NBSP -> space
+        .replace(/[\u2010-\u2015]/g, '-') // various hyphens -> '-'
+        .replace(/[""„‟]/g, '"') // fancy double quotes -> "
+        .replace(/[''‚‛]/g, "'") // fancy single quotes -> '
+        .replace(/\s+/g, ' ') // collapse whitespace
+        .trim();
+        // Note: No .toLowerCase() for case-sensitive matching
+    };
+
     const result = summaryKeywords.find(kw => {
       const kwSentence = kw.sentence_number;
-      const kwNormalized = normalize(kw.text || kw.term || '');
+      const kwNormalized = normalizeForResolve(kw.text || kw.term || '');
       const aliasMatch = kw.aliases && Array.isArray(kw.aliases) && 
-        kw.aliases.some(alias => normalize(alias) === normalizedKeyword);
+        kw.aliases.some(alias => normalizeForResolve(alias) === normalizedKeyword);
       
       return kwSentence === sentenceNumber && (kwNormalized === normalizedKeyword || aliasMatch);
     });
@@ -1603,9 +1641,9 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     // Fallback: if sentence-based matching fails, try text-only matching
     if (!result) {
       const fallbackResult = summaryKeywords.find(kw => {
-        const kwNormalized = normalize(kw.text || kw.term || '');
+        const kwNormalized = normalizeForResolve(kw.text || kw.term || '');
         const aliasMatch = kw.aliases && Array.isArray(kw.aliases) && 
-          kw.aliases.some(alias => normalize(alias) === normalizedKeyword);
+          kw.aliases.some(alias => normalizeForResolve(alias) === normalizedKeyword);
         
         return kwNormalized === normalizedKeyword || aliasMatch;
       });
@@ -1617,7 +1655,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     }
     
     return result;
-  }, [summaryKeywords, normalize]);
+  }, [summaryKeywords]);
   
   // Helper function to map key_feature values to field names
   const mapFeatureToField = useCallback((feature) => {
@@ -1700,6 +1738,16 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     setEditedSummary('');
   };
 
+  // Ensure baseline summary is captured as soon as a non-empty summary exists
+  useEffect(() => {
+    if (!baselineSummaryRef.current && summary) {
+      baselineSummaryRef.current = summary;
+      try {
+        console.log('📝 [Baseline] Input data\n    ', { type: 'summary', data: summary });
+      } catch (_) {}
+    }
+  }, [summary]);
+
   // Function to handle keyword extraction
   const handleKeywordExtraction = async (summaryText) => {
     try {
@@ -1715,6 +1763,12 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       if (result && result.keywords && Array.isArray(result.keywords)) {
         setSummaryKeywords(result.keywords);
         console.log('✅ Keywords extracted:', result.keywords.length, 'keywords');
+        if (baselineKeywordsRef.current == null) {
+          baselineKeywordsRef.current = result.keywords;
+          try {
+            console.log('📝 [Baseline] Input data\n    ', { type: 'keywords', data: result.keywords });
+          } catch (_) {}
+        }
         return result.keywords;
       } else {
         setSummaryKeywords([]);
@@ -2011,8 +2065,11 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           
           if (result && result.keywords && Array.isArray(result.keywords)) {
             setSummaryKeywords(result.keywords);
+            if (baselineKeywordsRef.current == null) baselineKeywordsRef.current = result.keywords;
+            return result.keywords;
           } else {
             setSummaryKeywords([]);
+            return [];
           }
         } catch (kwErr) {
           setKeywordErr(`Failed to extract keywords: ${kwErr.message || 'Unknown error'}`);
@@ -2618,6 +2675,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         // Finalize the summary (NOT adding to chat messages)
         const finalSummary = streamingSummary || summary;
         setSummary(finalSummary);
+        if (baselineSummaryRef.current == null && finalSummary) baselineSummaryRef.current = finalSummary;
         
         // Build structured data and extract keywords (only if not already extracted)
         if (finalSummary && summaryKeywords.length === 0) {
@@ -2633,6 +2691,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               const result = await extractKeywordsFromSummary(finalSummary, structured, patient.exam_id);
               if (result && result.keywords && Array.isArray(result.keywords)) {
                 setSummaryKeywords(result.keywords);
+                if (baselineKeywordsRef.current == null) baselineKeywordsRef.current = result.keywords;
               } else {
                 setSummaryKeywords([]);
               }
@@ -2727,6 +2786,43 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     setSelectedKeyword(null);
     setKeywordFilteredVideos([]);
   };
+
+  // Listen for DetailEditor baseline reset to restore baseline summary/keywords without regeneration
+  useEffect(() => {
+    const onBaselineReset = () => {
+      // Show loading state for summary (2 seconds) but restore keywords immediately
+      setIsGeneratingSummary(true);
+      setStreamingSummary('');
+      
+      // Clear current summary immediately
+      setSummary('');
+      
+      // Exit edit mode and clear edited text
+      setIsSummaryEditMode(false);
+      setEditedSummary('');
+      
+      // Restore keywords immediately
+      if (baselineKeywordsRef.current != null) {
+        setSummaryKeywords(baselineKeywordsRef.current);
+        try {
+          console.log('📝 [Baseline Restore] Input data\n    ', { type: 'keywords', data: baselineKeywordsRef.current });
+        } catch (_) {}
+      }
+      
+      // Restore summary after 2 seconds
+      setTimeout(() => {
+        if (baselineSummaryRef.current != null) {
+          setSummary(baselineSummaryRef.current);
+          try {
+            console.log('📝 [Baseline Restore] Input data\n    ', { type: 'summary', data: baselineSummaryRef.current });
+          } catch (_) {}
+        }
+        setIsGeneratingSummary(false);
+      }, 2000);
+    };
+    window.addEventListener('detailEditorResetToBaseline', onBaselineReset);
+    return () => window.removeEventListener('detailEditorResetToBaseline', onBaselineReset);
+  }, []);
 
   // Update patient data from detail panel with summary regeneration
   const updatePatientDataFromDetailWithSummary = async (updatedStructuredData) => {
@@ -3072,8 +3168,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const highlightTerms = useCallback((text, keywords, sentenceNumber = null) => {
     if (!text || !keywords || keywords.length === 0) return text;
 
-    // Normalize helper to make matching robust to spaces, NBSP, hyphens, quotes, case
-    const normalize = (str) => {
+    // Case-sensitive normalize helper for highlighting (preserves case)
+    const normalizeForHighlight = (str) => {
       if (!str) return '';
       return str
         .normalize('NFKC')
@@ -3082,8 +3178,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         .replace(/[""„‟]/g, '"') // fancy double quotes -> "
         .replace(/[''‚‛]/g, "'") // fancy single quotes -> '
         .replace(/\s+/g, ' ') // collapse whitespace
-        .trim()
-        .toLowerCase();
+        .trim();
+        // Note: No .toLowerCase() for case-sensitive matching
     };
 
     // Sort keywords by length (longest first) to avoid partial replacements
@@ -3100,7 +3196,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       const kwSentence = kw.sentence_number || sentenceNumber || 1;
       
       if (keywordText) {
-        const normalizedTerm = normalize(keywordText);
+        const normalizedTerm = normalizeForHighlight(keywordText);
         const uniqueId = `${kwSentence}::${normalizedTerm}`;
         termsToHighlight.push({
           term: keywordText,
@@ -3118,7 +3214,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       }
       if (kw.aliases && Array.isArray(kw.aliases)) {
         kw.aliases.forEach(alias => {
-          const normalizedAlias = normalize(alias);
+          const normalizedAlias = normalizeForHighlight(alias);
           const uniqueId = `${kwSentence}::${normalizedAlias}`;
           termsToHighlight.push({
             term: alias,
@@ -3151,14 +3247,14 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       const flexibleHyphens = flexibleSpaces.replace(/\\\-/g, '[-\u2010-\u2015]');
       return flexibleHyphens;
     });
-    const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
+    const regex = new RegExp(`(${patterns.join('|')})`, 'g');
 
     // Split text and process
     const parts = text.split(regex);
     
     return parts.map((part, index) => {
-      // Find matching keyword info using normalized comparison
-      const normalizedPart = normalize(part);
+      // Find matching keyword info using case-sensitive normalized comparison
+      const normalizedPart = normalizeForHighlight(part);
       const match = termsToHighlight.find(t => t.normalizedTerm === normalizedPart);
       
       if (match) {
@@ -3339,7 +3435,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           new Promise(resolve => setTimeout(resolve, 1000))
         ]);
         
-        console.log('🔍 getExamEntryById result:', entry);
         if (entry) {
           setExamEntry(entry);
         } else {
@@ -3809,9 +3904,11 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                   onClick={handleSummaryReset}
                   disabled={isUpdatingStructuredData}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M4 2V8H10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M10 14V8H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M21 3v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M3 21v-5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                   <span>Reset</span>
                 </button>
@@ -4075,6 +4172,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                 <DetailEditor 
                   structuredData={structuredData}
                   patientData={patientData}
+                  baselinePatientData={originalPatientData?.patientData || patient}
                   onUpdate={updatePatientDataFromDetail}
                   onApplyWithSummary={updatePatientDataFromDetailWithSummary}
                   onClose={closeDetailPanel}
