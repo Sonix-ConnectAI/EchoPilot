@@ -18,6 +18,8 @@ const BottomSheet = ({
   const draggingRef = useRef(false);
   const startYRef = useRef(0);
   const startHeightPxRef = useRef(0);
+  const contentRef = useRef(null);
+  const scrollPositionRef = useRef(0);
 
   useEffect(() => {
     // Resolve container: prop > .edit-panel > document.body
@@ -49,6 +51,30 @@ const BottomSheet = ({
     };
   }, [isOpen, containerEl]);
 
+  // Preserve scroll position during re-renders
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement) return;
+
+    const handleScroll = () => {
+      scrollPositionRef.current = contentElement.scrollTop;
+    };
+
+    contentElement.addEventListener('scroll', handleScroll);
+    return () => contentElement.removeEventListener('scroll', handleScroll);
+  }, [isActive]);
+
+  // Restore scroll position after render
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (contentElement && scrollPositionRef.current > 0) {
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        contentElement.scrollTop = scrollPositionRef.current;
+      });
+    }
+  });
+
   const isBodyContainer = containerEl === document.body;
 
   // helpers to convert between px and style unit
@@ -79,6 +105,8 @@ const BottomSheet = ({
   const handleClose = () => {
     setIsActive(false);
     setIsClosing(true);
+    // Reset scroll position when closing
+    scrollPositionRef.current = 0;
     setTimeout(() => {
       setIsClosing(false);
       onClose();
@@ -156,7 +184,7 @@ const BottomSheet = ({
           <h3 className="sheet-title">{title}</h3>
           <button className="close-btn" onClick={handleClose}>✕</button>
         </div>
-        <div className="bottom-sheet-content">
+        <div className="bottom-sheet-content" ref={contentRef}>
           {children}
         </div>
         <div className="sheet-footer-actionbar">

@@ -560,7 +560,24 @@
   padding-right: 0px;
   min-width: 0; /* flex item이 축소될 수 있도록 */
   position: relative;
+}
+
+/* Header Dropdowns Container */
+.header-dropdowns-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex: 0 0 70%; /* 고정 크기, 축소되지 않음 */
   z-index: 9997;
+}
+
+/* Dropdown Trigger */
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  cursor: pointer;
 }
 
 /* Dropdown Cards */
@@ -572,11 +589,12 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   flex: 1 1 0;
   min-width: 0;
   margin-left: 0;
   z-index: 9998;
+  gap: 4px;
 }
 
 .dropdown-card:first-of-type {
@@ -595,6 +613,7 @@
   font-weight: 500;
   text-transform: capitalize;
   letter-spacing: -0.12px;
+  margin-bottom: 2px;
 }
 
 .dropdown-content {
@@ -719,7 +738,7 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  flex: 1 1 30%;
+  flex: 0 0 28%; /* 고정 크기, 축소되지 않음 */
   min-width: 100px;
   margin-right: 0;
 }
@@ -768,7 +787,8 @@
   backface-visibility: hidden;
 }
 
-.panel-header {
+/* Video panel header - more specific selector */
+.video-panel .panel-header {
   background: #1D212B;
   display: flex;
   align-items: center;
@@ -784,6 +804,41 @@
   align-items: center;
   gap: 8px;
   color: var(--text-primary);
+}
+
+.panel-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-left: 12px;
+  padding: 6px 8px;
+  background: rgba(0, 123, 255, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 123, 255, 0.2);
+  vertical-align: middle;
+  align-self: center;
+  min-height: 24px;
+}
+
+.panel-spinner .loading-spinner {
+  width: 14px !important;
+  height: 14px !important;
+  border: 2px solid rgba(0, 123, 255, 0.3) !important;
+  border-top: 2px solid #007bff !important;
+  border-radius: 50% !important;
+  animation: spin 1s linear infinite !important;
+  flex-shrink: 0;
+  align-self: center;
+  margin-bottom: 0 !important;
+}
+
+.panel-spinner .spinner-text {
+  font-size: 0.85rem;
+  color: #007bff;
+  font-weight: 500;
+  line-height: 1;
+  align-self: center;
 }
 
 .ai-indicator {
@@ -1234,7 +1289,6 @@
   margin-bottom: 15px;
   padding-bottom: 12px;
   margin-top: 0;
-  padding: 0;
 }
 
 /* Keyword Extracting Indicator */
@@ -1866,14 +1920,14 @@
 
 .feature-field .field-select:hover {
   background: #121722;
-  border-color: #12e3bf;
+  border-color: #00d4aa; /* keep border color stable on hover */
 }
 
-.feature-field .field-select:focus {
+.feature-field .field-select:focus-visible {
   outline: none;
   background: #121722;
-  border-color: #12e3bf;
-  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.25);
+  border-color: #00d4aa; /* keep border color stable on focus */
+  box-shadow: none; /* avoid glow to prevent perceived color change */
 }
 
 .feature-field .field-select:disabled {
@@ -2107,7 +2161,7 @@
   display: flex;
   gap: 15px;
   justify-content: flex-end;
-  padding-top: 20px;
+  padding-top: 10px;
   margin-top: 0px;
 }
 
@@ -4609,17 +4663,21 @@
 
 /* All Features Content Styles */
 .all-features-content {
+  position: relative;
+  width: 100%;
   max-height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 .feature-category-section {
-  margin-bottom: 24px;
+  position: absolute;
   padding: 16px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  width: calc(33.333% - 14px); /* 3열 그리드, gap 고려 */
+  box-sizing: border-box;
 }
 
 .category-title {
