@@ -1955,10 +1955,9 @@
 
 /* Measurement Fields */
 .measurement-fields {
-  padding: 5px;
-  margin-bottom: 25px;
+  padding-top: 0px;
   animation: slideInDown 0.5s ease-out;
-  max-height: 100%;
+  height: calc(100% - 52px);
   overflow-y: auto;
   overflow-x: hidden;
   width: 100%;
@@ -3348,8 +3347,7 @@
   padding-top: 0px;
   animation: slideInDown 0.5s ease-out;
   /* Limit by viewport so inner scroll can appear */
-  max-height: calc(100vh - 220px);
-  min-height: 0; /* allow overflow inside flex parent */
+  height: calc(100% - 52px);
   overflow-y: auto;
   overflow-x: hidden;
   width: 100%;
