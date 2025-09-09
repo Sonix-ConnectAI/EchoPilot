@@ -546,18 +546,20 @@ const fillFromSample = (analysisDf, sample, mode) => {
     const k1 = row.Field;
     const k2 = `${row.Category}//${row.Field}`;
     const rawVal = sample[k1] || sample[k2] || null;
-    
+
     let value = extractValue(rawVal, mode);
-    
+
     // Special cases like Python version
     if (row.Category.toLowerCase() === 'cardiomyopathy' && row.Field === 'cardiomyopathy_type') {
+      value = extractValue(rawVal, 'true_label');
+    } else if (row.Category.toLowerCase() === 'cardiomyopathy' && row.Field === 'hypertrophic_type') {
       value = extractValue(rawVal, 'true_label');
     } else if (row.Category.toLowerCase() === 'lv_geometry' && row.Field === 'lvh_presence') {
       value = extractValue(rawVal, 'true_label');
     } else {
       value = extractValue(rawVal, mode);
     }
-    
+
     return { ...row, Value: value };
   });
 };
@@ -657,21 +659,32 @@ const KEYWORD_SYS_PROMPT_KO_V6 = `
 심초음파 요약에서 임상적 키워드를 추출하세요.
 
 ## 핵심 규칙
-- **키워드: 원문에서 2~5개의 단어를 그대로 추출해야 함 (대소문자/공백/구두점 정확히/재구성 금지)**
+- **키워드: 원문에서 15~20개의 단어를 그대로 추출해야 함 (대소문자/공백/구두점 정확히/재구성 금지)**
 - **매우 중요: 문장에 있는 키워드를 그대로 복사해서 가져와야 합니다. 절대 다른 표현으로 바꾸지 마세요**
-- **문장보다는 단어 위주로 추출하세요**
-- **key_feature: 각 키워드당 5개 이상의 관련 필드 포함 (중요도 순으로 나열) - 무조건 필수**
-- **key_measure_feature: 각 키워드당 3개 이상의 관련 측정값 필드 포함 (중요도 순으로 나열) - 무조건 필수**
+- **문장 말고 단어 위주로 추출하세요**
+- **key_feature: 각 키워드당 15개 이상의 관련 필드 포함 (선택된 키워드와 유사도가 높은 순으로 나열) - 무조건 필수**
+- **key_measure_feature: 각 키워드당 15개 이상의 관련 측정값 필드 포함 (선택된 키워드와 유사도가 높은 순으로 나열) - 무조건 필수**
 - **중요도: 1(경미)~5(긴급)**
 - **카테고리는 배열 형태로 여러 개 선택 가능합니다** (예: ["lv_geometry", "lv_systolic_function"])
 
-- **매우 중요**: key_feature는 아래 "사용 가능한 카테고리 별 필드" 목록에서만 선택해야 합니다. 다른 필드는 절대 사용하지 마세요. **key_feature 배열은 임상적 중요도 순으로 정렬해야 합니다 (가장 중요한 필드가 먼저)**
-- **매우 중요**: key_measure_feature는 아래 "사용 가능한 측정값 필드" 목록에서만 선택해야 합니다. 다른 측정값은 절대 사용하지 마세요. **key_measure_feature 배열도 임상적 중요도 순으로 정렬해야 합니다 (가장 중요한 측정값이 먼저)**
+- **매우 중요**: key_feature는 아래 "사용 가능한 카테고리 별 필드" 목록에서만 선택해야 합니다. 다른 필드는 절대 사용하지 마세요. **key_feature 배열은 선택된 키워드와 유사도가 높은 순으로 정렬해야 합니다**
+- **매우 중요**: key_measure_feature는 아래 "사용 가능한 측정값 필드" 목록에서만 선택해야 합니다. 다른 측정값은 절대 사용하지 마세요. **key_measure_feature 배열도 선택된 키워드와 유사도가 높은 순으로 정렬해야 합니다**
 - **매우 중요**: 한 문장에서 필수적으로 하나 이상의 키워드를 무조건 추출해야 합니다**
 - **매우 중요**: 문장 번호 "1."에서 추출된 키워드는 sentence_number: 1, "2."에서 추출된 키워드는 sentence_number: 2 등으로 설정하세요.**
 - **매우 중요**: 같은 키워드가 여러 문장에 나타나면 각 문장별로 별도의 키워드 엔트리를 만들어야 합니다.**
 - **매우 중요**: 모든 키워드에 대해 key_feature와 key_measure_feature를 반드시 포함해야 합니다. 빈 배열이나 누락은 절대 허용되지 않습니다.**
 - **매우 중요**: key_feature와 key_measure_feature는 반드시 위에 제공된 필드 목록에서만 선택해야 합니다. 목록에 없는 필드는 절대 사용하지 마세요.**
+
+## 병태생리학적 인과관계 반영 규칙 (매우 중요)
+- **key_feature와 key_measure_feature는 단순 관련성이 아닌 인과관계 체인을 반영해야 합니다**
+- **순서: 1) 직접 원인/형태 → 2) 1차 결과 → 3) 2차 파급효과 → 4) 보상기전**
+- **각 키워드에 대해 다음을 고려하세요:**
+  - Primary cause (근본 원인 또는 직접 관련 구조)
+  - Direct hemodynamic effect (직접적인 혈역학적 영향)
+  - Secondary chamber/structural changes (이차적 구조 변화)
+  - Compensatory mechanisms (보상 기전)
+  - Downstream consequences (하류 영향)
+
 
 ## 예시
 원문: "Moderate pulmonary hypertension, likely secondary to left heart disease"
@@ -680,8 +693,36 @@ const KEYWORD_SYS_PROMPT_KO_V6 = `
 key_feature: ["pulmonary_hypertension", "pulmonary_artery_dilatation", "pulmonary_artery_stenosis", "pulmonary_artery_thrombus", "rv_dysfunction", "rv_dilation"]
 key_measure_feature: ["rvsp", "rv_fac", "tapse"]
 
+## Severe MR 예시 (필수 참고)
+입력: "Severe mitral regurgitation"
+출력:
+{
+  "key_feature_by_category": {
+    "mv": ["mv_regurgitation", "functional", "annular_ring"],  // 직접 원인
+    "lv_geometry": ["lv_cavity_size", "lvh_pattern"],  // LV volume overload
+    "lv_systolic_function": ["global_LV_systolic_function"],  // LV dysfunction
+    "atria": ["la_size", "la_sec_presence"],  // LA enlargement
+    "pulmonary_vessels": ["pulmonary_hypertension"],  // Secondary PH
+    "rv_geometry_function": ["rv_dilation", "rv_dysfunction"]  // RV impact
+  },
+  "key_measure_feature_by_category": {
+    "mv": ["MR ERO", "MR Regurgitant Volume"],
+    "lv_geometry": ["LVEDD", "LVESD", "LV Mass"],
+    "lv_systolic_function": ["lvef", "LV EDV", "LV ESV"],
+    "atria": ["LA volume"],
+    "pulmonary_vessels": ["rvsp"],
+    "lv_diastolic_function": ["E/E'"]  // LA pressure estimation
+  }
+}
 
-## 사용 가능한 카테고리 별 필드 
+## 체크리스트 (키워드 추출 시 반드시 확인)
+□ 직접 관련 카테고리 포함했는가?
+□ 1차 영향받는 chamber 포함했는가?
+□ 2차 파급효과 포함했는가?
+□ 혈역학적 결과 포함했는가?
+□ 최소 10개 이상 카테고리 선택했는가?
+
+## 사용 가능한 카테고리 별 필드
 lv_geometry: lv_cavity_size, lvh_presence, lvh_pattern, increased_lv_wall_thickeness, diffuse_lv_wall_thickening_pattern, asymmetric_lv_wall_thickening_pattern, local_lv_wall_thickening_pattern_septum, local_lv_wall_thickening_pattern_apex, local_lv_wall_thickening_pattern_other, sigmoid_septum_or_basal_or_septal_hypertrophy_presence, papillary_muscle_abnormality, apical_burnout, D_shape, myocardial_texture_abnormality
 lv_systolic_function: apical_sparing, RWMA, abnormal_septal_motion, global_LV_systolic_function, lv_sec_presence
 lv_diastolic_function: transmitral_flow_pattern_abnormality, pulmonary_venous_flow_pattern_abnormality, diastolic_dysfunction_grade
@@ -1030,5 +1071,106 @@ export const extractKeywordsFromSummary = async (summaryText, structPred = {}, e
   } catch (error) {
     console.error('extractKeywordsFromSummary failed:', error);
     return { keywords: [], suggestions: [], warnings: [] };
+  }
+};
+
+// New functions for FinalReport
+export const generateConclusionFromData = async (summary, structuredData, options = {}) => {
+  try {
+    console.log('📋 [Conclusion] Generating clinical conclusion...');
+    
+    const CONCLUSION_PROMPT = `
+역할: 당신은 경험 많은 심장내과 전문의로서 심초음파(echocardiography) 검사 결과를 바탕으로 구조화된 심초음파 소견(Conclusion)을 작성합니다.
+작성 지침: Conclusion은 번호를 매긴 리스트 형태로 작성합니다. 핵심 이상 소견만 간결히 정리합니다. 전체적으로 간결하고 명료한 표현을 사용합니다. 긴 문장은 피하세요. 작성은 영어로 합니다.
+병태생리적 원인과 결과 관계를 명확하다면 그걸 포함하여 글을 간결히 작성하세요(e.g., “~로 인한”, “~관련된”).
+중요 수치는 반드시 괄호 안에 단위를 포함하여 표기합니다.
+
+아래 형식을 정확히 따라주세요 (예시 제공):
+Conclusion:
+1. Finding A (중요 수치 포함) 관련된 원인 설명
+2. Finding B (중요 수치 포함) 로 인한 결과 설명
+`;
+
+    const userContent = JSON.stringify({
+      summary: summary,
+      structuredData: structuredData
+    }, null, 2);
+
+    console.log('📋 [Conclusion] Input data:');
+    console.log('    ', userContent);
+
+    const response = await callOpenAI(
+      CONCLUSION_PROMPT,
+      userContent,
+      { 
+        max_tokens: 1000, 
+        temperature: 0.3,
+        model: 'gpt-4.1-2025-04-14',
+        ...options 
+      }
+    );
+
+    console.log('📋 [Conclusion] Generated conclusion:');
+    console.log('    ', response);
+
+    return response;
+    
+  } catch (error) {
+    console.error('Failed to generate conclusion:', error);
+    throw error;
+  }
+};
+
+export const generateRecommendationFromData = async (summary, structuredData, options = {}) => {
+  try {
+    console.log('💡 [Recommendation] Generating clinical recommendations...');
+    
+    const RECOMMENDATION_PROMPT = `
+제공할 데이터:
+
+심초음파 검사 결과 (표로 제공)
+
+작성 지침:
+
+Clinical Recommendation이라는 제목으로 시작합니다.
+
+간결하면서도 동료 의사가 쉽게 이해할 수 있는 문장으로 작성합니다.
+
+권고사항을 명확히 기술하고, 그 근거로 제공된 데이터를 명시적으로 참조하여 뒷받침합니다.
+
+치료적 결정에 영향을 미치는 중요한 임상적 소견(e.g., 환자의 subjective symptoms 및 echocardiographic findings)을 모두 포함합니다.
+
+최종 권고사항을 명확히 기술하고 근거를 요약적으로 제시합니다.
+
+영어로 작성하며, 명료하고 간결한 문장을 사용합니다.
+`;
+
+    const userContent = JSON.stringify({
+      summary: summary,
+      structuredData: structuredData
+    }, null, 2);
+
+    console.log('💡 [Recommendation] Input data:');
+    console.log('    ', userContent);
+
+    const response = await callOpenAI(
+      RECOMMENDATION_PROMPT,
+      userContent,
+      { 
+        max_tokens: 1000, 
+        temperature: 0.3,
+        model: 'gpt-4.1-2025-04-14',
+        ...options 
+      }
+    );
+
+    console.log('💡 [Recommendation] Generated recommendations:');
+    console.log('    ', response);
+
+    return response;
+    
+  } catch (error) {
+    console.error('Failed to generate recommendations:', error);
+    throw error;
   }
 };

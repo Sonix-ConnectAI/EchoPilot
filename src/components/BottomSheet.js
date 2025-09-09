@@ -10,6 +10,8 @@ const BottomSheet = ({
   container: containerProp,
   height: heightProp,
   footerActionbar,
+  categoryFilters,
+  onCategoryFilterChange,
 }) => {
   const [isActive, setIsActive] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -181,9 +183,23 @@ const BottomSheet = ({
             onMouseDown={(e) => { e.preventDefault(); startDrag(e.clientY); }}
             onTouchStart={(e) => { if (e.touches && e.touches.length) { e.preventDefault(); startDrag(e.touches[0].clientY); } }}
           ></div>
-          <h3 className="sheet-title">{title}</h3>
           <button className="close-btn" onClick={handleClose}>✕</button>
         </div>
+        {categoryFilters && (
+          <div className="category-filter-section">
+            <div className="category-filter-buttons">
+              {categoryFilters.map((category) => (
+                <button
+                  key={category.key}
+                  className={`category-filter-btn ${category.active ? 'active' : ''}`}
+                  onClick={() => onCategoryFilterChange && onCategoryFilterChange(category.key)}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="bottom-sheet-content" ref={contentRef}>
           {children}
         </div>

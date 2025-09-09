@@ -41,18 +41,17 @@
 /* Header layout */
 .sheet-header {
     position: relative;
-    padding-top: 28px;
-    padding-bottom: 8px;
+    padding-top: 5px;
+    padding-bottom: 5px;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
 }
 
 .sheet-title {
     margin: 0;
     color: #e6eaf2;
-    font-size: 24px;
+    font-size: 16px;
     font-weight: 600;
     text-align: center;
     pointer-events: none;
@@ -78,7 +77,7 @@
 
 .close-btn {
     position: absolute;
-    top: 12px;
+    top: 8px;
     right: 12px;
     display: inline-flex;
     align-items: center;
@@ -116,6 +115,9 @@
     padding: 14px;
     width: calc(33.333% - 14px); /* 3열 그리드, gap 고려 */
     box-sizing: border-box;
+    overflow: hidden; /* Prevent content from overflowing */
+    word-wrap: break-word; /* Allow long words to break */
+    transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .bottom-sheet .category-title {
@@ -123,6 +125,7 @@
     font-size: 18px;
     font-weight: 600;
     color: #e6eaf2;
+    text-align: center;
 }
 
 .bottom-sheet .category-fields {
@@ -131,7 +134,335 @@
     gap: 0px;
     overflow: visible;
     max-height: none;
+    width: 100%;
 }
+
+
+/* BottomSheet specific feature item styling - copied from RecommendFeature.css */
+.bottom-sheet .bottom-sheet-feature-item {
+    background: #1D212B;
+    padding: 10px 10px;
+    border-radius: 0px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.bottom-sheet .bottom-sheet-feature-item:last-child {
+    border-bottom: none;
+}
+
+.bottom-sheet .bottom-sheet-feature-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(249, 168, 37, 0.3);
+    transform: none; /* remove movement */
+}
+
+/* Feature Row Layout */
+.bottom-sheet .bottom-sheet-feature-row {
+    display: flex;
+    align-items: center; /* vertically center category + name + control */
+    justify-content: space-between;
+    margin-bottom: 0;
+    padding: 0;
+    gap: 15px;
+    width: 100%;
+    min-width: 0;
+}
+
+.bottom-sheet .bottom-sheet-feature-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal; /* allow wrapping */
+    word-break: break-word; /* wrap long tokens */
+    line-height: 1.4;
+}
+
+/* Feature Field Container */
+.bottom-sheet .bottom-sheet-feature-field {
+    flex: 0 0 auto;
+    width: 150px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* Feature Field Input Styling */
+.bottom-sheet .bottom-sheet-feature-field input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    background: #0F1218;
+    border: 1px solid #00d4aa;
+    border-radius: 16px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.25);
+}
+
+.bottom-sheet .bottom-sheet-feature-field input[type="text"]:hover {
+    background: #121722;
+    border-color: #12e3bf;
+}
+
+.bottom-sheet .bottom-sheet-feature-field input[type="text"]:focus {
+    outline: none;
+    background: #121722;
+    border-color: #12e3bf;
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.25);
+}
+
+/* Feature Field Number Input Styling */
+.bottom-sheet .bottom-sheet-feature-field input[type="number"] {
+    width: 100%;
+    padding: 8px 12px;
+    background: #0F1218;
+    border: 1px solid #00d4aa;
+    border-radius: 16px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.25);
+}
+
+.bottom-sheet .bottom-sheet-feature-field input[type="number"]:hover {
+    background: #121722;
+    border-color: #12e3bf;
+}
+
+.bottom-sheet .bottom-sheet-feature-field input[type="number"]:focus {
+    outline: none;
+    background: #121722;
+    border-color: #12e3bf;
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.25);
+}
+
+.bottom-sheet .bottom-sheet-feature-field input[type="number"]:disabled {
+    background: rgba(255, 255, 255, 0.05);
+    color: #999;
+    cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Feature Field Select Styling */
+.bottom-sheet .bottom-sheet-feature-field .field-select {
+    width: 100%;
+    padding: 8px 36px 8px 12px; /* space for custom caret */
+    background: #0F1218;
+    border: 1px solid #00d4aa;
+    border-radius: 16px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.25);
+    position: relative;
+}
+
+.bottom-sheet .bottom-sheet-feature-field .field-select:hover {
+    background: #121722;
+    border-color: #12e3bf;
+}
+
+.bottom-sheet .bottom-sheet-feature-field .field-select:focus {
+    outline: none;
+    background: #121722;
+    border-color: #12e3bf;
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.25);
+}
+
+.bottom-sheet .bottom-sheet-feature-field .field-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Feature Field Checkbox Styling */
+.bottom-sheet .bottom-sheet-feature-field .field-checkbox {
+    width: 16px;
+    height: 16px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 0px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    position: relative;
+    transition: all 0.2s ease;
+    margin-left: auto;
+}
+
+.bottom-sheet .bottom-sheet-feature-field .field-checkbox:checked {
+    background: #6aa0ff;
+    border-color: #6aa0ff;
+}
+
+.bottom-sheet .bottom-sheet-feature-field .field-checkbox:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.bottom-sheet .bottom-sheet-feature-field .field-checkbox:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(106, 160, 255, 0.2);
+}
+
+/* Feature Dropdown (FeatureDropdown component) */
+.bottom-sheet .feature-dd { 
+    position: relative; 
+    width: 100%; 
+}
+
+.bottom-sheet .feature-dd .field-select { 
+    width: 100%; 
+    text-align: left; 
+    position: relative;
+    padding-right: 36px; /* space for caret */
+}
+
+/* Custom dropdown arrow */
+.bottom-sheet .feature-dd .field-select::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 12px 12px;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3e%3cpath d='M6 9l6 6 6-6' stroke='%23BFBFBF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+    opacity: 0.9;
+}
+
+.bottom-sheet .feature-dd .field-select[aria-expanded="true"]::after {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+.bottom-sheet .feature-dd .dropdown-options { 
+    width: 100%; 
+}
+
+/* Portal dropdown styling for feature fields */
+.bottom-sheet .feature-dd-portal {
+    border-radius: 18px;
+    padding: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    box-shadow: 0 16px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08) inset;
+    background: #000000;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.bottom-sheet .feature-dd-portal.top {
+    transform-origin: bottom;
+}
+
+.bottom-sheet .feature-dd-portal.bottom {
+    transform-origin: top;
+}
+
+/* Feature highlighting when navigated to */
+.bottom-sheet .bottom-sheet-feature-item.highlighted {
+    background: rgba(249, 168, 37, 0.15);
+    border-color: rgba(249, 168, 37, 0.5);
+    animation: highlightPulse 2s ease-in-out;
+    box-shadow: 0 0 15px rgba(249, 168, 37, 0.3);
+}
+
+@keyframes highlightPulse {
+    0% {
+        background: rgba(249, 168, 37, 0.15);
+        box-shadow: 0 0 15px rgba(249, 168, 37, 0.3);
+    }
+    50% {
+        background: rgba(249, 168, 37, 0.25);
+        box-shadow: 0 0 25px rgba(249, 168, 37, 0.5);
+    }
+    100% {
+        background: rgba(249, 168, 37, 0.15);
+        box-shadow: 0 0 15px rgba(249, 168, 37, 0.3);
+    }
+}
+
+/* Hide default arrow in IE */
+.bottom-sheet .bottom-sheet-feature-field .field-select::-ms-expand { 
+    display: none; 
+}
+
+/* For general feature field inputs that are not text or checkbox */
+.bottom-sheet .bottom-sheet-feature-field input:not([type="checkbox"]),
+.bottom-sheet .bottom-sheet-feature-field select {
+    flex: 1;
+    padding: 3px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.bottom-sheet .bottom-sheet-feature-field input:not([type="checkbox"]):focus,
+.bottom-sheet .bottom-sheet-feature-field select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Feature field checkbox positioning */
+.bottom-sheet .bottom-sheet-feature-field input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin-left: auto;
+    cursor: pointer;
+    accent-color: #F9A825;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Narrower width for checkbox rows */
+.bottom-sheet .bottom-sheet-feature-row.checkbox-row {
+    grid-template-columns: 1fr auto;
+}
+
+/* Narrower width for feature-field when it contains checkbox */
+.bottom-sheet .bottom-sheet-feature-row.checkbox-row .bottom-sheet-feature-field {
+    width: auto;
+    min-width: auto;
+}
+
+/* Field input styling for checkbox rows */
+.bottom-sheet .bottom-sheet-feature-row .field-input {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.bottom-sheet .field-input .field-checkbox {
+    margin-left: auto;
+}
+
 
 /* Basic field styling for bottom sheet */
 .bottom-sheet .field-label {
@@ -159,7 +490,6 @@
 }
 
 .bottom-sheet-content {
-    margin-top: 10px;
     line-height: 1.6;
     overflow: auto;
     flex: 1 1 auto;
@@ -243,4 +573,50 @@
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Category Filter Section */
+.category-filter-section {
+    padding: 12px 16px 8px 16px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.category-filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.category-filter-btn {
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e6eaf2;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.category-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.category-filter-btn.active {
+    background: linear-gradient(135deg, #00d4aa 0%, #00a585 100%);
+    border-color: #00d4aa;
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 212, 170, 0.3);
+}
+
+.category-filter-btn.active:hover {
+    background: linear-gradient(135deg, #00e6bf 0%, #00b894 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 212, 170, 0.4);
 }

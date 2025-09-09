@@ -136,3 +136,6 @@ config.local.json
 
 # claude
 .claude/
+
+# notebook
+notebook/

@@ -8,12 +8,59 @@ import { getExamEntryById} from '../utils/dbUtils';
 import BottomSheet from './BottomSheet';
 
 // Hoisted: AllFeaturesRecommendStyle renders all-features-content without remounting on field edits
-const AllFeaturesRecommendStyle = memo(({ isOpen, editedStructuredData, onFieldChange }) => {
-  const categories = useMemo(() => (
-    Object.entries(standardizedStructure || {}).filter(([_, fields]) => (
+const AllFeaturesRecommendStyle = memo(({ isOpen, editedStructuredData, onFieldChange, activeCategoryFilters }) => {
+  const categories = useMemo(() => {
+    // Ensure activeCategoryFilters is a valid array
+    const filters = activeCategoryFilters || ['all'];
+    
+    const allCategories = Object.entries(standardizedStructure || {}).filter(([_, fields]) => (
       fields && typeof fields === 'object' && !Array.isArray(fields)
-    ))
-  ), []);
+    ));
+    
+    // Merge measure fields into existing categories
+    const categoriesWithMeasures = allCategories.map(([categoryKey, fields]) => {
+      const measureFields = standardizedStructure_measure[categoryKey];
+      if (measureFields) {
+        // Convert measure fields to the format we need
+        const convertedMeasureFields = Object.keys(measureFields).reduce((acc, fieldName) => {
+          acc[fieldName] = { type: 'measure', dataType: 'float' };
+          return acc;
+        }, {});
+        
+        // Merge feature fields and measure fields
+        const mergedFields = { ...fields, ...convertedMeasureFields };
+        return [categoryKey, mergedFields];
+      }
+      return [categoryKey, fields];
+    });
+    
+    // Add standalone measure categories (categories that don't exist in standardizedStructure)
+    const existingCategoryKeys = allCategories.map(([key]) => key);
+    const standaloneMeasureCategories = Object.entries(standardizedStructure_measure || {})
+      .filter(([key]) => !existingCategoryKeys.includes(key))
+      .map(([key, fields]) => [
+        key, 
+        Object.keys(fields).reduce((acc, fieldName) => {
+          acc[fieldName] = { type: 'measure', dataType: 'float' };
+          return acc;
+        }, {})
+      ]);
+    
+    const combinedCategories = [...categoriesWithMeasures, ...standaloneMeasureCategories];
+    
+    // Filter based on activeCategoryFilters
+    let filteredCategories;
+    if (filters.includes('all')) {
+      filteredCategories = combinedCategories;
+    } else {
+      filteredCategories = combinedCategories.filter(([categoryKey]) => 
+        filters.includes(categoryKey)
+      );
+    }
+    
+    
+    return filteredCategories;
+  }, [activeCategoryFilters]);
 
   // FeatureDropdown component for bottom sheet
   const FeatureDropdown = memo(({ options, value, onChange, placeholder = 'Select...' }) => {
@@ -106,79 +153,120 @@ const AllFeaturesRecommendStyle = memo(({ isOpen, editedStructuredData, onFieldC
 
   FeatureDropdown.displayName = 'FeatureDropdown';
 
-  // Masonry layout effect - only when BottomSheet opens or container size changes
+  // Masonry layout effect - when BottomSheet opens, categories change, or container size changes
   useEffect(() => {
     const container = document.querySelector('.bottom-sheet .all-features-content');
     if (!container) return;
 
+    // Immediately hide sections to prevent overlap during layout
     const sections = Array.from(container.children);
-    if (sections.length === 0) return;
-
-    // Sort sections alphabetically by category title
-    sections.sort((a, b) => {
-      const titleA = a.querySelector('.category-title')?.textContent || '';
-      const titleB = b.querySelector('.category-title')?.textContent || '';
-      return titleA.localeCompare(titleB);
-    });
-
-    // Reset positioning
     sections.forEach(section => {
-      section.style.position = 'static';
-      section.style.top = 'auto';
-      section.style.left = 'auto';
+      section.style.opacity = '0';
     });
 
-    // Calculate positions for masonry layout
-    const columns = 3;
-    const gap = 20;
-    const columnHeights = new Array(columns).fill(0);
-    const columnWidth = (container.offsetWidth - gap * (columns - 1)) / columns;
+    // Use requestAnimationFrame for smooth layout update
+    const updateLayout = () => {
+      if (sections.length === 0) return;
 
-    sections.forEach((section, index) => {
-      const columnIndex = index % columns;
-      const x = columnIndex * (columnWidth + gap);
-      const y = columnHeights[columnIndex];
+      // Reset positioning (keep original order)
+      sections.forEach(section => {
+        section.style.position = 'static';
+        section.style.top = 'auto';
+        section.style.left = 'auto';
+      });
 
-      section.style.position = 'absolute';
-      section.style.top = `${y}px`;
-      section.style.left = `${x}px`;
-      section.style.width = `${columnWidth}px`;
+      // Calculate positions for masonry layout
+      const columns = 3;
+      const gap = 20;
+      const columnHeights = new Array(columns).fill(0);
+      const columnWidth = (container.offsetWidth - gap * (columns - 1)) / columns;
 
-      columnHeights[columnIndex] += section.offsetHeight + gap;
-    });
+      // Sort sections by the order they appear in activeCategoryFilters
+      const sortedSections = sections.sort((a, b) => {
+        const categoryA = a.getAttribute('data-category');
+        const categoryB = b.getAttribute('data-category');
+        const indexA = activeCategoryFilters.indexOf(categoryA);
+        const indexB = activeCategoryFilters.indexOf(categoryB);
+        return indexA - indexB;
+      });
 
-    const maxHeight = Math.max(...columnHeights);
-    container.style.height = `${maxHeight}px`;
-    container.style.position = 'relative';
+      sortedSections.forEach((section, index) => {
+        // Find the shortest column
+        const shortestColumnIndex = columnHeights.indexOf(Math.min(...columnHeights));
+        const x = shortestColumnIndex * (columnWidth + gap);
+        const y = columnHeights[shortestColumnIndex];
 
-  }, [isOpen]);
+        section.style.position = 'absolute';
+        section.style.top = `${y}px`;
+        section.style.left = `${x}px`;
+        section.style.width = `${columnWidth}px`;
 
+        columnHeights[shortestColumnIndex] += section.offsetHeight + gap;
+      });
+
+      const maxHeight = Math.max(...columnHeights);
+      container.style.height = `${maxHeight}px`;
+      container.style.position = 'relative';
+
+      // Show sections with smooth transition
+      sections.forEach(section => {
+        section.style.opacity = '1';
+      });
+    };
+
+    // Use requestAnimationFrame for immediate but smooth update
+    requestAnimationFrame(updateLayout);
+  }, [isOpen, categories.length, activeCategoryFilters]);
+
+  
   return (
     <div className="all-features-content">
-      {categories.map(([category, fields]) => {
+      {categories.length === 0 ? (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#e6eaf2' }}>
+          No categories available
+        </div>
+      ) : (
+        categories.map(([category, fields]) => {
         const formattedCategory = String(category)
           .replace(/_/g, ' ')
           .replace(/\b\w/g, l => l.toUpperCase())
           .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase());
 
         return (
-          <div key={category} className="feature-category-section">
+          <div key={category} className="feature-category-section" data-category={category}>
             <h4 className="category-title">{formattedCategory}</h4>
             <div className="category-fields">
               {Object.entries(fields).map(([fieldName, fieldOptions]) => {
                 const currentValue = editedStructuredData?.[category]?.[fieldName] ?? '';
+                
+                // Check if this is a measure field
+                const isMeasureField = fieldOptions && typeof fieldOptions === 'object' && fieldOptions.type === 'measure';
+                
                 return (
-                  <div key={fieldName} className="recommend-feature-item">
-                    <div className={`feature-row ${Array.isArray(fieldOptions) && fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no') ? 'checkbox-row' : ''}`}>
-                      <span className="feature-name">
+                  <div key={fieldName} className="bottom-sheet-feature-item">
+                    <div className={`bottom-sheet-feature-row ${Array.isArray(fieldOptions) && fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no') ? 'checkbox-row' : ''}`}>
+                      <span className="bottom-sheet-feature-name">
                         {fieldName
                           .replace(/_/g, ' ')
                           .replace(/\b\w/g, l => l.toUpperCase())
                           .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase())
                         }
                       </span>
-                      {Array.isArray(fieldOptions) ? (
-                        <div className="feature-field">
+                      {isMeasureField ? (
+                        // Measure fields: always show as read-only number input
+                        <div className="bottom-sheet-feature-field">
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={currentValue}
+                            readOnly
+                            disabled
+                            placeholder="N/A"
+                          />
+                        </div>
+                      ) : Array.isArray(fieldOptions) ? (
+                        // Feature fields: checkbox or dropdown
+                        <div className="bottom-sheet-feature-field">
                           {(fieldOptions.length === 2 && fieldOptions.includes('yes') && fieldOptions.includes('no')) ? (
                             <input
                               type="checkbox"
@@ -200,12 +288,14 @@ const AllFeaturesRecommendStyle = memo(({ isOpen, editedStructuredData, onFieldC
                           )}
                         </div>
                       ) : (
-                        <div className="feature-field">
+                        // Feature fields: text input
+                        <div className="bottom-sheet-feature-field">
                           <input
-                            type="text"
+                            type={fieldOptions === 'float' ? 'number' : 'text'}
+                            step={fieldOptions === 'float' ? '0.1' : undefined}
                             value={currentValue}
                             onChange={(e) => onFieldChange(category, fieldName, e.target.value)}
-                            placeholder="Enter value"
+                            placeholder={fieldOptions === 'float' ? 'Enter number' : 'Enter value'}
                           />
                         </div>
                       )}
@@ -216,7 +306,8 @@ const AllFeaturesRecommendStyle = memo(({ isOpen, editedStructuredData, onFieldC
             </div>
           </div>
         );
-      })}
+      }))
+      }
     </div>
   );
 });
@@ -746,6 +837,7 @@ const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, o
     // Always treat as nested field to maintain shape: { category: { field: value } }
     const currentValue = editedStructuredData[category]?.[field];
     
+    
     // For boolean values (yes/no), render as checkbox
     if (options.length === 2 && options.includes('yes') && options.includes('no')) {
       return (
@@ -876,63 +968,47 @@ const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, o
           let fieldOptions = null;
           
           
-          // Check if it's a direct field in standardizedStructure
-          if (standardizedStructure[item.feature]) {
-            fieldCategory = item.feature;
-            currentValue = editedStructuredData[item.feature];
-            fieldOptions = standardizedStructure[item.feature];
-
-          } else {
-            // Check nested fields with exact match first
-            let found = false;
-            Object.entries(standardizedStructure).forEach(([cat, fields]) => {
-              if (typeof fields === 'object' && !Array.isArray(fields) && fields[item.feature]) {
-                  fieldCategory = cat;
-                  currentValue = editedStructuredData[cat]?.[item.feature];
-                  fieldOptions = fields[item.feature];
-                  found = true;
+          // 1) Prefer resolving strictly within the provided category to avoid cross-category collisions
+          let resolvedInHint = false;
+          if (item.category && standardizedStructure[item.category] && typeof standardizedStructure[item.category] === 'object') {
+            const fieldsInCat = standardizedStructure[item.category];
+            // exact match
+            if (fieldsInCat[item.feature]) {
+              fieldCategory = item.category;
+              currentValue = editedStructuredData[item.category]?.[item.feature];
+              fieldOptions = fieldsInCat[item.feature];
+              resolvedInHint = true;
+              
+            } else {
+              // case-insensitive within category
+              const matchedName = Object.keys(fieldsInCat).find(fn => fn.toLowerCase() === String(item.feature).toLowerCase());
+              if (matchedName) {
+                fieldCategory = item.category;
+                currentValue = editedStructuredData[item.category]?.[matchedName];
+                fieldOptions = fieldsInCat[matchedName];
+                item.feature = matchedName;
+                resolvedInHint = true;
+                
+              } else {
+                // value-includes within category
+                Object.entries(fieldsInCat).forEach(([fname, fvals]) => {
+                  if (!resolvedInHint && Array.isArray(fvals) && fvals.includes(item.feature)) {
+                    fieldCategory = item.category;
+                    currentValue = editedStructuredData[item.category]?.[fname];
+                    fieldOptions = fvals;
+                    item.feature = fname;
+                    resolvedInHint = true;
+                    
+                  }
+                });
               }
-            });
-            
-            // If not found, try case-insensitive match
-            if (!found) {
-              Object.entries(standardizedStructure).forEach(([cat, fields]) => {
-                if (typeof fields === 'object' && !Array.isArray(fields)) {
-                  Object.keys(fields).forEach(fieldName => {
-                    if (fieldName.toLowerCase() === item.feature.toLowerCase()) {
-                        fieldCategory = cat;
-                        currentValue = editedStructuredData[cat]?.[fieldName];
-                        fieldOptions = fields[fieldName];
-                        found = true;
-                    }
-                  });
-                }
-              });
             }
-            
-            // If still not found, check if it's a field value (like "eccentric_hypertrophy" in "lvh_pattern")
-            if (!found) {
-              Object.entries(standardizedStructure).forEach(([cat, fields]) => {
-                if (typeof fields === 'object' && !Array.isArray(fields)) {
-                  Object.entries(fields).forEach(([fieldName, fieldValues]) => {
-                    if (Array.isArray(fieldValues) && fieldValues.includes(item.feature)) {
-                        // This is a field value, not a field name
-                        fieldCategory = cat;
-                        currentValue = editedStructuredData[cat]?.[fieldName];
-                        fieldOptions = fieldValues;
-                        found = true;
-                        // Update the feature name to the actual field name
-                        item.feature = fieldName;
-                    }
-                  });
-                }
-              });
-            }
-            
-            // If still not found, log for debugging
-            if (!found) {
-              console.warn(`Feature not found in standardizedStructure: ${item.feature}`);
-            }
+          }
+
+          // 2) If not resolved within hint category, skip this item (no global fallback)
+          if (!resolvedInHint) {
+            console.warn(`Feature not resolved within hinted category, skipping: ${item.category} :: ${item.feature}`);
+            return null;
           }
           
           return (
@@ -1451,6 +1527,85 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   const [isImageQualityOpen, setIsImageQualityOpen] = useState(false);
   const [isCardiacRhythmOpen, setIsCardiacRhythmOpen] = useState(false);
   const [isAllFeaturesOpen, setIsAllFeaturesOpen] = useState(false);
+  
+  // Category filter state for BottomSheet (array to maintain order)
+  const [activeCategoryFilters, setActiveCategoryFilters] = useState(['all']);
+
+  // Generate category filters for BottomSheet
+  const getCategoryFilters = useMemo(() => {
+    const allCategories = Object.keys(standardizedStructure).filter(key => 
+      typeof standardizedStructure[key] === 'object' && !Array.isArray(standardizedStructure[key])
+    );
+    
+    // Add measure categories (only if they don't already exist in allCategories)
+    const measureCategories = Object.keys(standardizedStructure_measure).filter(key => 
+      !allCategories.includes(key)
+    );
+    
+    const allCategoryKeys = ['all', ...allCategories, ...measureCategories];
+    
+    
+    return allCategoryKeys.map(key => {
+      let label = key === 'all' ? 'All' : 
+             key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase());
+      
+      // Shorten specific long category names
+      if (key === 'lv_diastolic_function') label = 'LV Diastolic';
+      if (key === 'lv_systolic_function') label = 'LV Systolic';
+      if (key === 'rv_geometry_function') label = 'RV Geometry';
+      if (key === 'pericardial_disease') label = 'PE';
+      if (key === 'pulmonary_vessels') label = 'PA';
+      
+      // if (key === 'lv_geometry') label = ''
+      // if (key === 'lv_systolic_function') label = ''
+      // if (key === 'lv_diastolic_function') label = ''
+      // if (key === 'rv_geometry_function') label = ''
+      // if (key === 'atria') label = ''
+      // if (key === 'av') label = ''
+      // if (key === 'mv') label = ''
+      // if (key === 'tv') label = ''
+      // if (key === 'pv') label = ''
+      // if (key === 'aorta') label = ''
+      // if (key === 'ivc') label = ''
+      // if (key === 'pulmonary_vessels') label = ''
+      // if (key === 'pericardial_disease') label = ''
+      // if (key === 'cardiomyopathy') label = ''
+      // if (key === 'intracardiac_findings') label = ''
+      
+        return {
+          key,
+          label,
+          active: activeCategoryFilters.includes(key)
+        };
+    });
+  }, [activeCategoryFilters]);
+
+  // Handle category filter change
+  const handleCategoryFilterChange = useCallback((categoryKey) => {
+    setActiveCategoryFilters(prev => {
+      if (categoryKey === 'all') {
+        // If clicking "All Features", toggle all categories
+        if (prev.includes('all')) {
+          return [];
+        } else {
+          return ['all'];
+        }
+      } else {
+        // Remove 'all' if it exists
+        const withoutAll = prev.filter(key => key !== 'all');
+        
+        // Toggle the specific category
+        if (withoutAll.includes(categoryKey)) {
+          const newFilters = withoutAll.filter(key => key !== categoryKey);
+          // If no categories are selected, add 'all'
+          return newFilters.length === 0 ? ['all'] : newFilters;
+        } else {
+          return [...withoutAll, categoryKey];
+        }
+      }
+    });
+  }, []);
 
   
 
@@ -3188,7 +3343,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     );
 
     // Build a map of terms to replace including aliases with unique IDs
-    const termsToHighlight = [];
+    let termsToHighlight = [];
     
     sortedKeywords.forEach((kw, kwIndex) => {
       // Use term field, fallback to text field if term is empty
@@ -3228,6 +3383,15 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         });
       }
     });
+
+    // If a specific sentenceNumber is provided, only highlight keywords from that sentence
+    if (sentenceNumber != null) {
+      const targetSentence = Number(sentenceNumber);
+      termsToHighlight = termsToHighlight.filter(t => {
+        const kwSentence = Number(t.originalKeyword?.sentence_number || 1);
+        return kwSentence === targetSentence;
+      });
+    }
 
     // Debug: snapshot of terms to highlight (disabled by default for performance)
     // Uncomment for debugging keyword matching issues
@@ -3525,9 +3689,23 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
 
   // Prefill structuredData whenever patientData changes
   useEffect(() => {
-    console.log('patientData!!!!!!!!!!!!!!!!!!!!!!!!:', patientData);
+    // console.log는 개발 환경에서만 사용하고, 조건부로 실행
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📝 [PatientData] Input data');
+      console.log(patientData);
+    }
+    
     const built = structurePatientData(patientData);
-    console.log('built!!!!!!!!!!!!!!!!!!!!!!!!:', built);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📝 [PatientData] Built structured data');
+      console.log(built);
+    }
+    
+    // 실제 로직은 여기서 처리
+    if (built) {
+      setStructuredData(built);
+    }
   }, [patientData]);
   
 
@@ -4261,6 +4439,23 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       {/* Footer */}
       <div className="footer">
         <div className="footer-content">
+          <div className="footer-left">
+            <button className="back-button" onClick={onBack}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Back
+            </button>
+          </div>
+          <div className="footer-right">
+            {/* <button 
+              className="final-report-button" 
+              onClick={() => onProceed('final-report', { summary, structuredData })}
+              disabled={!summary}
+            >
+              Final Report
+            </button> */}
+          </div>
         </div>
       </div>
 
@@ -4268,6 +4463,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       <BottomSheet
         isOpen={isAllFeaturesOpen}
         onClose={() => setIsAllFeaturesOpen(false)}
+        categoryFilters={getCategoryFilters}
+        onCategoryFilterChange={handleCategoryFilterChange}
         footerActionbar={
           <div className="bottom-sheet-editor-actions">
             <button 
@@ -4308,6 +4505,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         <AllFeaturesRecommendStyle
           isOpen={isAllFeaturesOpen}
           editedStructuredData={editorHandlers?.editedStructuredData}
+          activeCategoryFilters={activeCategoryFilters}
           onFieldChange={(category, field, value) => {
             // delegate to DetailEditor via editorHandlers by dispatching a synthetic change through structuredData merge
             // We rely on DetailEditor owning the state change through its public handlers when Apply/Cancel/Reset; live edits update local state there.
