@@ -4,12 +4,14 @@ import PatientSelection from './components/PatientSelection';
 import PatientDataView from './components/PatientDataView';
 import PatientAssessment from './components/PatientAssessment';
 import PatientDetail from './components/PatientDetail';
+import FinalReport from './components/FinalReport';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('selection');
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [assessedPatient, setAssessedPatient] = useState(null);
   const [isProcessingPatient, setIsProcessingPatient] = useState(false);
+  const [assessmentData, setAssessmentData] = useState(null);
 
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
@@ -42,6 +44,11 @@ function App() {
     setCurrentPage('detail');
   };
 
+  const handleProceedToFinalReport = (data) => {
+    setAssessmentData(data);
+    setCurrentPage('final-report');
+  };
+
   const handleAssessmentReady = () => {
     setIsProcessingPatient(false);
   };
@@ -63,7 +70,18 @@ function App() {
           <PatientAssessment 
             patient={selectedPatient} 
             onBack={handleBackToDataView}
-            onProceed={handleProceedToDetail}
+            onProceed={(action, data) => {
+              if (action === 'final-report') {
+                // Pass assessment data to final report
+                handleProceedToFinalReport({
+                  patient: selectedPatient,
+                  summary: data?.summary || '',
+                  structuredData: data?.structuredData || {}
+                });
+              } else {
+                handleProceedToDetail(action);
+              }
+            }}
             onReady={handleAssessmentReady}
             isProcessing={isProcessingPatient}
           />
@@ -72,7 +90,16 @@ function App() {
         return (
           <PatientDetail 
             patient={assessedPatient || selectedPatient} 
-            onBack={handleBackToAssessment} 
+            onBack={() => setCurrentPage('assessment')} 
+          />
+        );
+      case 'final-report':
+        return (
+          <FinalReport 
+            patient={assessmentData?.patient || selectedPatient}
+            summary={assessmentData?.summary}
+            structuredData={assessmentData?.structuredData}
+            onBack={() => setCurrentPage('assessment')}
           />
         );
       default:

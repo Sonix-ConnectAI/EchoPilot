@@ -4,7 +4,7 @@
 /* Recommend Feature Section */
 .recommend-feature-section {
   padding: 5px;
-  margin-bottom: 25px;
+  margin-top: 40px;
   animation: slideInDown 0.5s ease-out;
   max-height: 100%;
   overflow-y: auto;
