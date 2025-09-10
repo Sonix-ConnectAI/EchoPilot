@@ -15,16 +15,18 @@ function App() {
 
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
-    setAssessmentData(null); // 새로운 환자 선택 시 기존 assessment 데이터 초기화
-    setAssessedPatient(null); // 새로운 환자 선택 시 기존 assessed patient 데이터 초기화
-    setIsProcessingPatient(false); // 처리 상태 초기화
+    // 새 환자 선택 시 이전 평가 결과/상태 초기화 (요약 재생성 유도)
+    setAssessmentData(null);
+    setAssessedPatient(null);
+    setIsProcessingPatient(false);
     setCurrentPage('dataview');
   };
 
   const handleBackToSelection = () => {
     setSelectedPatient(null);
     setAssessedPatient(null);
-    setAssessmentData(null); // selection으로 돌아갈 때 assessment 데이터 초기화
+    // selection으로 돌아갈 때도 이전 평가 데이터 제거해 다음 선택 시 초기 상태 보장
+    setAssessmentData(null);
     setIsProcessingPatient(false);
     setCurrentPage('selection');
   };
@@ -38,6 +40,24 @@ function App() {
   };
 
   const handleContinueToAssessment = (patient) => {
+    const isSamePatient = selectedPatient && (selectedPatient.exam_id || selectedPatient.id) === (patient && (patient.exam_id || patient.id));
+    const hasExistingSummary = !!(assessmentData && assessmentData.summary);
+
+    if (isSamePatient && hasExistingSummary) {
+      console.log('📝 [Navigation] DataView → Assessment (reuse existing summary)\n', {
+        patient: patient && (patient.exam_id || patient.id),
+        hasExistingSummary
+      });
+      setSelectedPatient(patient);
+      setIsProcessingPatient(false);
+      setCurrentPage('assessment');
+      return;
+    }
+
+    console.log('📝 [Navigation] DataView → Assessment (re-generate)\n', {
+      patient: patient && (patient.exam_id || patient.id),
+      hasExistingSummary
+    });
     setSelectedPatient(patient);
     setIsProcessingPatient(true);
     setCurrentPage('assessment');
@@ -78,6 +98,10 @@ function App() {
             initialKeywords={assessmentData?.keywords || []}
             onBack={handleBackToDataView}
             onEndExam={handleBackToSelection}
+            onAssessmentDataChange={(data) => {
+              // Keep latest assessment snapshot for reuse on navigation
+              setAssessmentData(data);
+            }}
             onProceed={(action, data) => {
               if (action === 'final-report') {
                 // Pass assessment data to final report
@@ -95,13 +119,7 @@ function App() {
             isProcessing={isProcessingPatient}
           />
         );
-      case 'detail':
-        return (
-          <PatientDetail 
-            patient={assessedPatient || selectedPatient} 
-            onBack={() => setCurrentPage('assessment')} 
-          />
-        );
+
       case 'final-report':
         return (
           <FinalReport 
@@ -109,7 +127,15 @@ function App() {
             summary={assessmentData?.summary}
             structuredData={assessmentData?.structuredData}
             onBack={() => {
-              console.log('📝 [App] End Exam - Returning to Patient Selection');
+              console.log('📝 [Back] Final Report → Assessment');
+              setCurrentPage('assessment');
+            }}
+            onEndExam={() => {
+              console.log('📝 [End Exam] Final Report → Selection');
+              setSelectedPatient(null);
+              setAssessedPatient(null);
+              setAssessmentData(null);
+              setIsProcessingPatient(false);
               setCurrentPage('selection');
             }}
           />

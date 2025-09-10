@@ -1999,13 +1999,15 @@
 }
 
 .measurement-category-text {
-  font-size: 12px;
-  display: inline-block;
-  margin-right: 8px;
-  padding: 2px 8px;
+  background: #ffffff14;
   border-radius: 10px;
+  color: #E6EAF2;
+  display: inline-block;
   font-size: 12px;
   font-weight: 600;
+  margin-right: 8px;
+  padding: 2px 8px;
+  text-transform: none;
 }
 
 .measurement-name {
@@ -2036,6 +2038,15 @@
   color: var(--text-primary);
   font-size: 14px;
   transition: all 0.3s ease;
+}
+
+/* Disable editing and show not-allowed cursor */
+.measurement-field input[type="text"] {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+.measurement-field input[type="text"]:hover {
+  cursor: not-allowed;
 }
 
 .measurement-field input[type="text"]:focus {
@@ -3502,12 +3513,14 @@
 }
 
 .feature-category-label {
-  display: inline-block;
-  margin-right: 8px;
-  padding: 2px 8px;
+  background: #ffffff14;
   border-radius: 10px;
+  color: #E6EAF2;
+  display: inline-block;
   font-size: 12px;
   font-weight: 600;
+  margin-right: 8px;
+  padding: 2px 8px;
   text-transform: none;
 }
 

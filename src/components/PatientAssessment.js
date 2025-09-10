@@ -1406,7 +1406,7 @@ const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, o
                       type="text"
                       value={value || ''}
                       onChange={(e) => handleNumericChange(category, field, e.target.value)}
-                      placeholder="Enter value"
+                      placeholder="N/A"
                     />
                   </div>
                 </div>
@@ -1466,7 +1466,7 @@ const SummaryLine = memo(({ line, sentenceNumber, makeTextClickable }) => {
 
 SummaryLine.displayName = 'SummaryLine';
 
-const PatientAssessment = memo(({ patient, initialSummary = '', initialStructuredData = null, initialKeywords = [], onBack, onEndExam, onProceed }) => {
+const PatientAssessment = memo(({ patient, initialSummary = '', initialStructuredData = null, initialKeywords = [], onBack, onEndExam, onProceed, onAssessmentDataChange }) => {
   console.log('📝 [PatientAssessment] Component props:', { 
     patient: patient?.exam_id, 
     initialSummary: initialSummary?.length || 0, 
@@ -2195,6 +2195,15 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
       setTimeout(() => {
         setIsInitializing(false);
       }, 10000);
+      // Ensure parent holds latest snapshot as well
+      if (typeof onAssessmentDataChange === 'function') {
+        onAssessmentDataChange({
+          patient,
+          summary,
+          structuredData,
+          keywords: summaryKeywords
+        });
+      }
       return;
     }
     
@@ -2233,6 +2242,15 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
       console.log('🔍 aiSummary:', aiSummary);
 
       setSummary(aiSummary);
+      // Propagate latest assessment snapshot upward
+      if (typeof onAssessmentDataChange === 'function') {
+        onAssessmentDataChange({
+          patient,
+          summary: aiSummary,
+          structuredData: sd,
+          keywords: summaryKeywords
+        });
+      }
       
       // Extract keywords from the generated summary (only if not already extracted)
       if (aiSummary && summaryKeywords.length === 0) {
@@ -2244,9 +2262,26 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
           if (result && result.keywords && Array.isArray(result.keywords)) {
             setSummaryKeywords(result.keywords);
             if (baselineKeywordsRef.current == null) baselineKeywordsRef.current = result.keywords;
+            // Propagate with extracted keywords
+            if (typeof onAssessmentDataChange === 'function') {
+              onAssessmentDataChange({
+                patient,
+                summary: aiSummary,
+                structuredData: sd,
+                keywords: result.keywords
+              });
+            }
             return result.keywords;
           } else {
             setSummaryKeywords([]);
+            if (typeof onAssessmentDataChange === 'function') {
+              onAssessmentDataChange({
+                patient,
+                summary: aiSummary,
+                structuredData: sd,
+                keywords: []
+              });
+            }
             return [];
           }
         } catch (kwErr) {
