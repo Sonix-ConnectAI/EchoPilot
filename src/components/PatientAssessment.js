@@ -563,7 +563,7 @@ const standardizedStructure_measure = {
 };
 
 // DetailEditor Component for editing patient data - Memoized for performance
-const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, onUpdate, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, onHandlersReady }) => {
+const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, onHandlersReady }) => {
   const [editedStructuredData, setEditedStructuredData] = useState(structuredData || {});
   const [originalStructuredData, setOriginalStructuredData] = useState(structuredData || {});
   const [hasChanges, setHasChanges] = useState(false);
@@ -667,13 +667,9 @@ const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, o
       });
     } catch (_) { /* noop */ }
     
-    if (onApplyWithSummary) {
-      setIsGeneratingSummary(true);
-      await onApplyWithSummary(finalData);
-      setIsGeneratingSummary(false);
-    } else {
-      onUpdate(finalData);
-    }
+    setIsGeneratingSummary(true);
+    await onApplyWithSummary(finalData);
+    setIsGeneratingSummary(false);
 
     // After successful apply, sync originals and clear change flag
     setOriginalStructuredData(finalData);
@@ -1392,15 +1388,28 @@ const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, o
           <h3>Measurements</h3>
           <div className="measurement-fields">
             {getMeasurementFields().map(({ category, field, value }, index) => (
-              <div key={`${category}-${field}-${index}`} className="measurement-field">
-                <label>{field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
-                <input
-                  type="number"
-                  value={value || ''}
-                  onChange={(e) => handleNumericChange(category, field, e.target.value)}
-                  step="0.1"
-                  placeholder="0.0"
-                />
+              <div key={`${category}-${field}-${index}`} className="measurement-item">
+                <div className="measurement-row">
+                  <div className="measurement-category-cell">
+                    <span className="measurement-category-text">
+                      {String(category || '')
+                        .replace(/_/g, ' ')
+                        .replace(/\b\w/g, l => l.toUpperCase())
+                        .replace(/\b(tv|mv|av|pv|ivc|la|ra|lv|rv|lvot|rvot|asd|pfo|vsd|pda|sam|ero|pisa|vti|pht|dt|ivrt|gls|rwt|tapse|fac)\b/gi, (match) => match.toUpperCase())}
+                    </span>
+                  </div>
+                  <span className="measurement-name">
+                    {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </span>
+                  <div className="measurement-field">
+                    <input
+                      type="text"
+                      value={value || ''}
+                      onChange={(e) => handleNumericChange(category, field, e.target.value)}
+                      placeholder="Enter value"
+                    />
+                  </div>
+                </div>
               </div>
             ))}
             
@@ -1457,18 +1466,25 @@ const SummaryLine = memo(({ line, sentenceNumber, makeTextClickable }) => {
 
 SummaryLine.displayName = 'SummaryLine';
 
-const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
+const PatientAssessment = memo(({ patient, initialSummary = '', initialStructuredData = null, initialKeywords = [], onBack, onEndExam, onProceed }) => {
+  console.log('📝 [PatientAssessment] Component props:', { 
+    patient: patient?.exam_id, 
+    initialSummary: initialSummary?.length || 0, 
+    initialStructuredData: initialStructuredData ? 'exists' : 'null',
+    initialKeywords: initialKeywords?.length || 0
+  });
+  
   const [patientData, setPatientData] = useState(patient);
-  const [summary, setSummary] = useState('');
+  const [summary, setSummary] = useState(initialSummary);
   const baselineSummaryRef = useRef(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [videoSegments, setVideoSegments] = useState([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
   const [error, setError] = useState(null);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
-  const [structuredData, setStructuredData] = useState(null);
+  const [structuredData, setStructuredData] = useState(initialStructuredData);
   const [selectedBlockType, setSelectedBlockType] = useState(null);
-  const [summaryKeywords, setSummaryKeywords] = useState([]);
+  const [summaryKeywords, setSummaryKeywords] = useState(initialKeywords);
   const baselineKeywordsRef = useRef(null);
   const [isExtractingKeywords, setIsExtractingKeywords] = useState(false);
   const [keywordErr, setKeywordErr] = useState(null);
@@ -1904,14 +1920,17 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   }, [summary]);
 
   // Function to handle keyword extraction
-  const handleKeywordExtraction = async (summaryText) => {
+  const handleKeywordExtraction = async (summaryText, customStructuredData = null) => {
     try {
         setIsExtractingKeywords(true);
       setKeywordErr(null);
       
+      // Use custom structuredData if provided, otherwise use current state
+      const dataToUse = customStructuredData || structuredData;
+      
       const result = await extractKeywordsFromSummary(
         summaryText, 
-        structuredData, 
+        dataToUse, 
         patientData?.exam_id || patient?.exam_id
       );
       
@@ -2165,9 +2184,12 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       return;
     }
     
-    // Prevent execution if summary already exists and keywords are extracted
-    if (summary && summaryKeywords.length > 0) {
+    // Prevent execution if summary already exists
+    if (summary && summary.trim() !== '') {
       hasGeneratedSummaryRef.current = true; // Mark as generated
+      console.log('📝 [handleGenerateSummary] Summary already exists, skipping generation');
+      console.log('📝 [handleGenerateSummary] Existing summary length:', summary.length, 'characters');
+      console.log('📝 [handleGenerateSummary] Summary preview:', summary.substring(0, 100) + '...');
       // Loading 완료 처리
       updateLoadingPhase(5, 'Assessment ready!');
       setTimeout(() => {
@@ -2189,6 +2211,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
   
   // Fallback HTTP method for summary generation
   const handleGenerateSummaryHTTP = async () => {
+    console.log('🔍 Running handleGenerateSummaryHTTP to generate summary from structuredData...');
     setIsGeneratingSummary(true);
     setError(null);
     
@@ -2289,7 +2312,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       categories.includes(video.category)
     );
     
-    console.log('📹 Videos after category filtering:', filtered.length);
     console.log('📹 Category distribution:', filtered.reduce((acc, video) => {
       acc[video.category] = (acc[video.category] || 0) + 1;
       return acc;
@@ -2304,9 +2326,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     
     // Take more videos initially to ensure we get 5 unique ones
     const initialCount = Math.min(filtered.length, 50); // Take up to 50 videos initially
-    
-    console.log('🔍 Checking first', initialCount, 'videos for uniqueness...');
-    
+        
     for (let i = 0; i < initialCount; i++) {
       const video = filtered[i];
       if (!seenFnames.has(video.fname)) {
@@ -2322,8 +2342,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         console.log(`⚠️ Skipped duplicate video: ${video.fname} (${video.category})`);
       }
     }
-    
-    console.log('📊 Final unique videos found:', uniqueVideos.length);
     
     // If we don't have enough videos from the specific categories, add videos from other categories
     if (uniqueVideos.length < 5) {
@@ -2516,10 +2534,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         panelTransitionTimeoutRef.current = null;
         
         // Log after state change with delay
-        setTimeout(() => {
-          console.log('🔄 DOM state after transition - main-container classes:', document.querySelector('.main-container')?.className);
-          console.log('🔄 DOM state after transition - edit-panel classes:', document.querySelector('.edit-panel')?.className);
-        }, 50);
+        setTimeout(() => {}, 50);
       });
     }, 100); // Increased debounce to prevent rapid changes
   };
@@ -3031,7 +3046,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
           // Always re-extract keywords for the new summary to reflect updated features
           console.log('🔑 Re-extracting keywords for new summary...');
           console.log('🔍 newSummary:', newSummary);
-          await handleKeywordExtraction(newSummary);
+          console.log('🔍 updatedStructuredData for keywords:', updatedStructuredData);
+          await handleKeywordExtraction(newSummary, updatedStructuredData);
           
           console.log('✅ Summary regenerated successfully');
         } else {
@@ -3054,52 +3070,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     }
   };
 
-  // Update patient data from detail panel
-  const updatePatientDataFromDetail = (updatedStructuredData) => {
-    console.log('🔧 [PatientAssessment] updatePatientDataFromDetail called with:', updatedStructuredData);
-    
-    // Update structured data
-    setStructuredData(updatedStructuredData);
-    console.log('🔧 [PatientAssessment] structuredData updated to:', updatedStructuredData);
-    
-    // Convert structured data back to patient data format
-    // This is a simplified conversion - you may need to adjust based on your exact data format
-    const flattenedData = {};
-    Object.entries(updatedStructuredData).forEach(([category, value]) => {
-      if (typeof value === 'object' && value !== null) {
-        // Nested object - 중첩된 구조 유지
-        Object.entries(value).forEach(([field, fieldValue]) => {
-          // 중첩된 구조를 유지하면서 flat key도 생성
-          flattenedData[`${category}//${field}`] = fieldValue;  // 중첩 구조 유지
-          flattenedData[field] = fieldValue;  // flat key도 생성 (기존 호환성)
-        });
-      } else {
-        // Direct value
-        flattenedData[category] = value;
-      }
-    });
-    
-    setPatientData(prev => ({
-      ...prev,
-      ...flattenedData
-    }));
-    
-    // Only regenerate summary if not already generating and no summary exists
-    if (!isGeneratingSummary && !summary) {
-      handleGenerateSummary();
-    } else if (summary) {
-      // If summary already exists, just update it without re-extracting keywords
-      console.log('📝 Updating existing summary with new data...');
-      console.log('🔍 patientData:', patientData);
-      console.log('🔍 flattenedData:', flattenedData);
-      generateSummary({ ...patientData, ...flattenedData }).then(newSummary => {
-        setSummary(newSummary);
-        console.log('✅ Summary updated successfully');
-      }).catch(err => {
-        console.error('❌ Failed to update summary:', err);
-      });
-    }
-  };
 
 
   // Generate videos based on keyword categories and view_attention
@@ -3307,11 +3277,8 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         if (!seenFnames.has(video.fname)) {
           seenFnames.add(video.fname);
           uniqueVideos.push(video);
-          console.log(`✅ Added video from other category: ${video.fname} (${video.category})`);
         }
       }
-      
-      console.log('📊 Final videos after adding from other categories:', uniqueVideos.length);
     }
     
         // Return exactly 6 videos (or fewer if not enough available)
@@ -3583,6 +3550,31 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
     // Start loading sequence
     const initializeAssessment = async () => {
       try {
+        // 기존 데이터가 있는지 먼저 체크
+        if (summary && summary.trim() !== '') {
+          console.log('📝 [Component Mount] Existing data found, skipping spinner');
+          console.log('📝 [Component Mount] Summary length:', summary.length, 'characters');
+          console.log('📝 [Component Mount] Initial summary prop:', initialSummary);
+          
+          // 기존 데이터가 있을 때는 spinner 없이 바로 완료
+          setIsInitializing(false);
+          
+          // 백그라운드에서 비디오와 examEntry 로드
+          loadVideoSegments();
+          getExamEntryById(patient.exam_id).then(entry => {
+            if (entry) {
+              setExamEntry(entry);
+            } else {
+              console.warn('⚠️ No exam entry found for exam_id:', patient.exam_id);
+            }
+          });
+          
+          return;
+        }
+        
+        // 기존 데이터가 없을 때만 전체 로딩 과정 진행
+        console.log('📝 [Component Mount] No existing data, starting full loading process');
+        
         // Phase 1: Load Echocardiographic Exam (최소 1.5초 표시)
         updateLoadingPhase(1, 'Load Echocardiographic Exam...');
         const videoPromise = loadVideoSegments();
@@ -3593,17 +3585,16 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
         
         // Phase 2: Loading exam entry (최소 1초 표시)
         updateLoadingPhase(2, 'Preprocess Dicoms...');
-        const examPromise = getExamEntryById(patient.exam_id);
-        const [entry] = await Promise.all([
-          examPromise,
-          new Promise(resolve => setTimeout(resolve, 1000))
-        ]);
+        const entry = await getExamEntryById(patient.exam_id);
         
         if (entry) {
           setExamEntry(entry);
         } else {
           console.warn('⚠️ No exam entry found for exam_id:', patient.exam_id);
         }
+        
+        // Phase 2 완료를 위한 최소 대기 시간
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Phase 3: Generating AI summary (최소 2초 표시)
         updateLoadingPhase(3, 'Generating AI summary...');
@@ -3646,6 +3637,15 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
       }
     };
   }, []);
+  
+  // Check if we're returning from Final Report (summary exists but not generating)
+  useEffect(() => {
+    if (summary && summary.trim() !== '' && !isGeneratingSummary && !isInitializing) {
+      console.log('📝 [Component Re-render] Returning from Final Report - summary exists, skipping generation');
+      console.log('📝 [Component Re-render] Summary length:', summary.length, 'characters');
+      console.log('📝 [Component Re-render] Summary preview:', summary.substring(0, 100) + '...');
+    }
+  }, [summary, isGeneratingSummary, isInitializing]);
   
   // Regenerate videos when examEntry becomes available
   useEffect(() => {
@@ -3916,7 +3916,7 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
               setIsGeneratingSummary(false);
               setIsExtractingKeywords(false);
               setIsUpdatingStructuredData(false);
-              onBack();
+              onEndExam();
             }}>
               <span>End Exam</span>
             </div>
@@ -4351,7 +4351,6 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
                   structuredData={structuredData}
                   patientData={patientData}
                   baselinePatientData={originalPatientData?.patientData || patient}
-                  onUpdate={updatePatientDataFromDetail}
                   onApplyWithSummary={updatePatientDataFromDetailWithSummary}
                   onClose={closeDetailPanel}
                   selectedBlockType={selectedBlockType}
@@ -4448,13 +4447,13 @@ const PatientAssessment = memo(({ patient, onBack, onProceed }) => {
             </button>
           </div>
           <div className="footer-right">
-            {/* <button 
+            <button 
               className="final-report-button" 
-              onClick={() => onProceed('final-report', { summary, structuredData })}
+              onClick={() => onProceed('final-report', { summary, structuredData, keywords: summaryKeywords })}
               disabled={!summary}
             >
               Final Report
-            </button> */}
+            </button>
           </div>
         </div>
       </div>

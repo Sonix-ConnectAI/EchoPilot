@@ -81,87 +81,129 @@ const FinalReport = ({
   return (
     <div className="final-report-page">
       {/* Top Header */}
-      <div className="top-header">
-        <div className="header-content">
-          <div className="app-icon">
-            <img src="/logo/logo.PNG" alt="EchoPilot AI" className="logo-image" />
+      <div className="final-report-top-header">
+        <div className="final-report-header-content">
+          <div className="final-report-app-icon">
+            <img src="/logo/logo.PNG" alt="Sonix Health Logo" className="final-report-logo-image" />
           </div>
-          <div className="app-name">EchoPilot AI - Final Report</div>
+          <div className="final-report-app-name">Sonix Health</div>
         </div>
       </div>
 
       {/* Side Panel */}
-      <div className="side-panel">
-        <div className="side-panel-content">
-          <div className="side-panel-item">
-            <div className="side-panel-icon">
-              <img src="/logo/logo.PNG" alt="Logo" className="side-panel-logo" />
-            </div>
-            <div className="side-panel-tooltip">Home</div>
+      <div className="final-report-side-panel">
+        <div className="final-report-side-panel-content">
+          {/* Expand/Collapse Button */}
+          <div className="final-report-side-panel-toggle">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M6 4L10 8L6 12" stroke="#FFFFFF" strokeWidth="2" fill="none"/>
+            </svg>
           </div>
-          
-          <div className="side-panel-divider"></div>
-          
-          <div className="side-panel-item">
-            <div className="side-panel-icon user-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
+
+          {/* User/Team Button */}
+          <div className="final-report-side-panel-item" title="Team Management">
+            <div className="final-report-side-panel-icon final-report-user-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 8C10.2091 8 12 6.20914 12 4C12 1.79086 10.2091 0 8 0C5.79086 0 4 1.79086 4 4C4 6.20914 5.79086 8 8 8Z" stroke="#FFFFFF" strokeWidth="1.5"/>
+                <path d="M0 16C0 12.6863 3.58172 10 8 10C12.4183 10 16 12.6863 16 16" stroke="#FFFFFF" strokeWidth="1.5"/>
               </svg>
             </div>
-            <div className="side-panel-tooltip">Patient</div>
+            <span className="final-report-side-panel-tooltip">Team Management</span>
           </div>
-          
-          <div className="side-panel-item">
-            <div className="side-panel-icon ai-icon">
-              <img src="/logo/logo.PNG" alt="AI" className="ai-logo" />
+
+          {/* Divider */}
+          <div className="final-report-side-panel-divider"></div>
+
+          {/* AI Assistant */}
+          <div className="final-report-side-panel-item" title="AI Assistant">
+            <div className="final-report-side-panel-icon final-report-ai-icon">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <rect x="2" y="2" width="16" height="16" rx="2" stroke="#FFFFFF" strokeWidth="1.5"/>
+                <text x="10" y="12" textAnchor="middle" fill="#FFFFFF" fontSize="8" fontWeight="bold">AI</text>
+              </svg>
             </div>
-            <div className="side-panel-tooltip">AI Analysis</div>
+            <span className="final-report-side-panel-tooltip">AI Assistant</span>
+          </div>
+
+          {/* A/B Testing */}
+          <div className="final-report-side-panel-item" title="A/B Testing">
+            <div className="final-report-side-panel-icon final-report-ab-icon">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M3 3H8V17H3V3Z" stroke="#FFFFFF" strokeWidth="1.5"/>
+                <path d="M12 3H17V17H12V3Z" stroke="#FFFFFF" strokeWidth="1.5"/>
+                <text x="5.5" y="12" fill="#FFFFFF" fontSize="8" fontWeight="bold">A</text>
+                <text x="14.5" y="12" fill="#FFFFFF" fontSize="8" fontWeight="bold">B</text>
+              </svg>
+            </div>
+            <span className="final-report-side-panel-tooltip">A/B Testing</span>
+          </div>
+
+          {/* Gallery/Images */}
+          <div className="final-report-side-panel-item" title="Gallery">
+            <div className="final-report-side-panel-icon final-report-gallery-icon">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <rect x="2" y="2" width="16" height="16" rx="2" stroke="#FFFFFF" strokeWidth="1.5"/>
+                <circle cx="7" cy="7" r="2" stroke="#FFFFFF" strokeWidth="1.5"/>
+                <path d="M2 14L6 10L10 14L18 6" stroke="#FFFFFF" strokeWidth="1.5"/>
+              </svg>
+            </div>
+            <span className="final-report-side-panel-tooltip">Gallery</span>
           </div>
         </div>
       </div>
 
-      {/* Patient Info Container */}
-      <div className="patient-info-container">
-        <div className="patient-info-row">
-          <div className="patient-info-card">
-            <div className="patient-info-item">
-              <span className="info-label">Name:</span>
-              <span className="info-value-bold">{patientInfo.name}</span>
+      {/* Patient Information Panel */}
+      <div className="final-report-patient-info-container">
+        <div className="final-report-patient-info-row">
+          <div className="final-report-patient-info-card">
+            <div className="final-report-patient-info-item">
+              <span className="final-report-info-label">Patient ID:</span>
+              <span className="final-report-info-value">{patientInfo.id || 'N/A'}</span>
             </div>
-            <div className="patient-info-item">
-              <span className="info-label">Age:</span>
-              <span className="info-value">{patientInfo.age}</span>
+            <div className="final-report-patient-info-item">
+              <span className="final-report-info-label">Name:</span>
+              <span className="final-report-info-value-bold">{patient.name || 'N/A'}</span>
             </div>
-            <div className="patient-info-item">
-              <span className="info-label">Gender:</span>
-              <span className="info-value">{patientInfo.gender}</span>
+            <div className="final-report-patient-info-item">
+              <span className="final-report-info-label">Sex:</span>
+              <span className="final-report-info-value">{patient.gender || patient.sex || 'N/A'}</span>
             </div>
-            <div className="patient-info-item">
-              <span className="info-label">Exam ID:</span>
-              <span className="info-value">{patientInfo.id}</span>
+            <div className="final-report-patient-info-item">
+              <span className="final-report-info-label">Age:</span>
+              <span className="final-report-info-value">{patient.age || 'N/A'}</span>
+            </div>
+            <div className="final-report-patient-info-item">
+              <span className="final-report-info-label">Height:</span>
+              <span className="final-report-info-value">{patient.height || 'N/A'}</span>
+            </div>
+            <div className="final-report-patient-info-item">
+              <span className="final-report-info-label">Weight:</span>
+              <span className="final-report-info-value">{patient.weight || 'N/A'}</span>
+            </div>
+            <div className="final-report-patient-info-item">
+              <span className="final-report-info-label">HR:</span>
+              <span className="final-report-info-value">{patient.hr || patient.heart_rate || 'N/A'}</span>
+            </div>
+            <div className="final-report-patient-info-item">
+              <span className="final-report-info-label">BSA:</span>
+              <span className="final-report-info-value">{patient.bsa || 'N/A'}</span>
             </div>
           </div>
           
-          <div className="right-controls-container">
-            <div className="header-dropdowns-container">
-              {/* Empty for now - can add dropdowns if needed */}
-            </div>
-            
-            <div className="final-report-button" onClick={onBack}>
-              <span>Back to Assessment</span>
-            </div>
+          {/* End Exam Button */}
+          <div className="final-report-end-exam-button" onClick={onBack}>
+            <span>End Exam</span>
           </div>
         </div>
       </div>
 
       {/* Main Content - 3 Panel Grid */}
-      <div className="main-container">
+      <div className="final-report-main-container">
         <div className="final-report-grid">
           {/* Summary Panel */}
-          <div className="report-panel summary-panel">
-            <div className="panel-header">
-              <h3 className="panel-title">
+          <div className="final-report-panel final-report-summary-panel">
+            <div className="final-report-panel-header">
+              <h3 className="final-report-panel-title">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -172,19 +214,19 @@ const FinalReport = ({
                 Summary
               </h3>
             </div>
-            <div className="panel-content">
+            <div className="final-report-panel-content">
               {summary ? (
-                <div className="summary-content">
+                <div className="final-report-summary-content">
                   {summary.split('\n').map((line, index) => (
                     line.trim() && (
-                      <p key={index} className="summary-line">
+                      <p key={index} className="final-report-summary-line">
                         {line}
                       </p>
                     )
                   ))}
                 </div>
               ) : (
-                <div className="empty-state">
+                <div className="final-report-empty-state">
                   <p>No summary available</p>
                 </div>
               )}
@@ -192,9 +234,9 @@ const FinalReport = ({
           </div>
 
           {/* Conclusion Panel */}
-          <div className="report-panel conclusion-panel">
-            <div className="panel-header">
-              <h3 className="panel-title">
+          <div className="final-report-panel final-report-conclusion-panel">
+            <div className="final-report-panel-header">
+              <h3 className="final-report-panel-title">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -205,29 +247,29 @@ const FinalReport = ({
                 Conclusion
               </h3>
               {!conclusion && !isGeneratingConclusion && (
-                <button className="generate-btn" onClick={generateConclusion}>
+                <button className="final-report-generate-btn" onClick={generateConclusion}>
                   Generate
                 </button>
               )}
             </div>
-            <div className="panel-content">
+            <div className="final-report-panel-content">
               {isGeneratingConclusion ? (
-                <div className="loading-state">
-                  <div className="loading-spinner"></div>
+                <div className="final-report-loading-state">
+                  <div className="final-report-loading-spinner"></div>
                   <p>Generating conclusion...</p>
                 </div>
               ) : conclusion ? (
-                <div className="conclusion-content">
+                <div className="final-report-conclusion-content">
                   {conclusion.split('\n').map((line, index) => (
                     line.trim() && (
-                      <p key={index} className="conclusion-line">
+                      <p key={index} className="final-report-conclusion-line">
                         {line}
                       </p>
                     )
                   ))}
                 </div>
               ) : (
-                <div className="empty-state">
+                <div className="final-report-empty-state">
                   <p>Click "Generate" to create conclusion</p>
                 </div>
               )}
@@ -235,38 +277,38 @@ const FinalReport = ({
           </div>
 
           {/* Recommendation Panel */}
-          <div className="report-panel recommendation-panel">
-            <div className="panel-header">
-              <h3 className="panel-title">
+          <div className="final-report-panel final-report-recommendation-panel">
+            <div className="final-report-panel-header">
+              <h3 className="final-report-panel-title">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 Recommendation
               </h3>
               {!recommendation && !isGeneratingRecommendation && (
-                <button className="generate-btn" onClick={generateRecommendation}>
+                <button className="final-report-generate-btn" onClick={generateRecommendation}>
                   Generate
                 </button>
               )}
             </div>
-            <div className="panel-content">
+            <div className="final-report-panel-content">
               {isGeneratingRecommendation ? (
-                <div className="loading-state">
-                  <div className="loading-spinner"></div>
+                <div className="final-report-loading-state">
+                  <div className="final-report-loading-spinner"></div>
                   <p>Generating recommendations...</p>
                 </div>
               ) : recommendation ? (
-                <div className="recommendation-content">
+                <div className="final-report-recommendation-content">
                   {recommendation.split('\n').map((line, index) => (
                     line.trim() && (
-                      <p key={index} className="recommendation-line">
+                      <p key={index} className="final-report-recommendation-line">
                         {line}
                       </p>
                     )
                   ))}
                 </div>
               ) : (
-                <div className="empty-state">
+                <div className="final-report-empty-state">
                   <p>Click "Generate" to create recommendations</p>
                 </div>
               )}
@@ -276,18 +318,18 @@ const FinalReport = ({
       </div>
 
       {/* Footer */}
-      <div className="footer">
-        <div className="footer-content">
-          <div className="footer-left">
+      <div className="final-report-footer">
+        <div className="final-report-footer-content">
+          <div className="final-report-footer-left">
             {/* Empty for now */}
-          </div>
-          <div className="footer-right">
-            <button className="back-button" onClick={onBack}>
+            <button className="final-report-back-button" onClick={onBack}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               Back to Assessment
             </button>
+          </div>
+          <div className="final-report-footer-right">
           </div>
         </div>
       </div>

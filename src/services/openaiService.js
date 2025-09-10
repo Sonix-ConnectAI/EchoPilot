@@ -954,7 +954,7 @@ export const updateStructuredDataFromSummary = async (modifiedSummary, existingS
 // Function to generate summary from structuredData
 export const generateSummaryFromStructuredData = async (structuredData, options = {}) => {
   try {
-    console.log('📝 Generating summary from structuredData...');
+    console.log('📝 [Summary] Generating summary from structuredData...');
     
     const GENERATE_SUMMARY_PROMPT = `
 역할: 당신은 경험 많은 심장내과 전문의로서 심초음파(echocardiography) 검사 결과를 바탕으로 구조화된 심초음파 소견(Summary)을 작성합니다.
@@ -976,8 +976,10 @@ export const generateSummaryFromStructuredData = async (structuredData, options 
 ...
 (필요한만큼 추가)
 `;
-    console.log('🔍 structuredData:', structuredData);
-    console.log('🔍 Prompt:', GENERATE_SUMMARY_PROMPT);
+
+    console.log('🔍 [Summary] Input Prompt:', GENERATE_SUMMARY_PROMPT);
+    console.log('🔍 [Summary] Input Data:', structuredData);
+    
     const userContent = JSON.stringify(structuredData, null, 2);
     
     const response = await callOpenAI(
@@ -1008,7 +1010,10 @@ export const extractKeywordsFromSummary = async (summaryText, structPred = {}, e
     console.log('🔑 [Keywords] Input Prompt:');
     console.log('    ', KEYWORD_SYS_PROMPT_KO_V6);
     console.log('🔑 [Keywords] Input Data:');
-    console.log('    ', userPayload);
+    console.log('    ', summaryText);
+    console.log('    ', structPred);
+    console.log('    ', examId);
+
 
     const response = await callOpenAI(KEYWORD_SYS_PROMPT_KO_V6, userPayload, { max_tokens: 5000, temperature: 0.0, ...options });
     try {
