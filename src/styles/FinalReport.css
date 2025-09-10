@@ -20,7 +20,7 @@
 }
 
 /* Top Header */
-.top-header {
+.final-report-top-header {
   grid-area: header;
   height: 44px;
   background-color: var(--background-05, rgba(0, 0, 0, 0.9));
@@ -32,7 +32,7 @@
   position: relative;
 }
 
-.header-content {
+.final-report-header-content {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -43,7 +43,7 @@
   transform: translateX(-50%);
 }
 
-.app-icon {
+.final-report-app-icon {
   width: 24px;
   height: 24px;
   display: flex;
@@ -51,20 +51,20 @@
   justify-content: center;
 }
 
-.logo-image {
+.final-report-logo-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.app-name {
+.final-report-app-name {
   font-size: 16px;
   font-weight: 500;
   color: var(--text-white, #ffffff);
 }
 
 /* Side Panel */
-.side-panel {
+.final-report-side-panel {
   grid-area: sidebar;
   width: 60px;
   background-color: #0B0D10;
@@ -77,7 +77,7 @@
   grid-row: 2 / 4;
 }
 
-.side-panel-content {
+.final-report-side-panel-content {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -85,7 +85,7 @@
   width: 100%;
 }
 
-.side-panel-item {
+.final-report-side-panel-item {
   position: relative;
   width: 40px;
   height: 40px;
@@ -97,17 +97,17 @@
   transition: all 0.3s ease;
 }
 
-.side-panel-item:hover {
+.final-report-side-panel-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-.side-panel-item:hover .side-panel-tooltip {
+.final-report-side-panel-item:hover .final-report-side-panel-tooltip {
   opacity: 1;
   visibility: visible;
   transform: translateX(0);
 }
 
-.side-panel-icon {
+.final-report-side-panel-icon {
   width: 20px;
   height: 20px;
   display: flex;
@@ -115,7 +115,7 @@
   justify-content: center;
 }
 
-.side-panel-tooltip {
+.final-report-side-panel-tooltip {
   position: absolute;
   left: 50px;
   top: 50%;
@@ -134,7 +134,7 @@
   pointer-events: none;
 }
 
-.side-panel-tooltip::before {
+.final-report-side-panel-tooltip::before {
   content: '';
   position: absolute;
   left: -4px;
@@ -147,37 +147,37 @@
   border-right: 4px solid rgba(0, 0, 0, 0.9);
 }
 
-.side-panel-divider {
+.final-report-side-panel-divider {
   width: 32px;
   height: 1px;
   background-color: rgba(255, 255, 255, 0.2);
   margin: 10px 0;
 }
 
-.user-icon {
+.final-report-user-icon {
   background-color: #00B4D8;
   border-radius: 8px;
   padding: 8px;
 }
 
-.side-panel-logo {
+.final-report-side-panel-logo {
   width: 16px;
   height: 16px;
   object-fit: contain;
 }
 
-.ai-logo {
+.final-report-ai-logo {
   width: 24px;
   height: 24px;
   object-fit: contain;
 }
 
-.ai-icon {
+.final-report-ai-icon {
   background-color: transparent;
 }
 
 /* Patient Info Container */
-.patient-info-container {
+.final-report-patient-info-container {
   grid-area: patient-info;
   display: flex;
   align-items: center;
@@ -187,16 +187,16 @@
   z-index: 9997;
 }
 
-.patient-info-row {
+.final-report-patient-info-row {
   display: flex;
   gap: 15px;
   align-items: center;
   width: 100%;
-  justify-content: flex-start;
+  justify-content: space-between;
   flex-grow: 1;
 }
 
-.patient-info-card {
+.final-report-patient-info-card {
   background-color: #1D212B;
   border-radius: 16px;
   padding: 20px 40px;
@@ -204,11 +204,11 @@
   gap: 60px;
   align-items: center;
   height: 60px;
-  flex: 0 0 70%;
+  flex: 1;
   min-width: 400px;
 }
 
-.patient-info-item {
+.final-report-patient-info-item {
   display: flex;
   gap: 22px;
   align-items: center;
@@ -217,23 +217,50 @@
   flex-shrink: 0;
 }
 
-.info-label {
+.final-report-info-label {
   opacity: 0.5;
   font-weight: 500;
   color: var(--text-white, #ffffff);
 }
 
-.info-value {
+.final-report-info-value {
   opacity: 0.9;
   font-size: 16px;
   color: var(--text-white, #ffffff);
 }
 
-.info-value-bold {
+.final-report-info-value-bold {
   opacity: 0.9;
   font-size: 16px;
   font-weight: 700;
   color: var(--text-white, #ffffff);
+}
+
+/* End Exam Button */
+.final-report-end-exam-button {
+  background-color: #E9E9E9;
+  border-radius: 12px;
+  padding: 18px 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 0 0 20%; /* 고정 크기, 축소되지 않음 */
+  min-width: 100px;
+  margin-right: 0;
+}
+
+.final-report-end-exam-button span {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-white, #000000);
+}
+
+.final-report-end-exam-button:hover {
+  background-color: var(--background-05, #3A3E48);
+  transform: translateY(-2px);
 }
 
 .right-controls-container {
@@ -286,7 +313,7 @@
 }
 
 /* Main Container */
-.main-container {
+.final-report-main-container {
   grid-area: main-content;
   position: relative;
   width: 100%;
@@ -308,7 +335,7 @@
 }
 
 /* Report Panel Base Styles */
-.report-panel {
+.final-report-panel {
   background: #1D212B;
   border-radius: 12px;
   overflow: hidden;
@@ -318,7 +345,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.panel-header {
+.final-report-panel-header {
   background: rgba(0, 0, 0, 0.3);
   padding: 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -327,7 +354,7 @@
   justify-content: space-between;
 }
 
-.panel-title {
+.final-report-panel-title {
   font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
@@ -337,11 +364,11 @@
   margin: 0;
 }
 
-.panel-title svg {
+.final-report-panel-title svg {
   color: #00d4aa;
 }
 
-.panel-content {
+.final-report-panel-content {
   flex: 1;
   padding: 20px;
   overflow-y: auto;
@@ -349,7 +376,7 @@
 }
 
 /* Generate Button */
-.generate-btn {
+.final-report-generate-btn {
   background: linear-gradient(135deg, #00d4aa 0%, #00a585 100%);
   border: none;
   border-radius: 8px;
@@ -361,22 +388,22 @@
   transition: all 0.3s ease;
 }
 
-.generate-btn:hover {
+.final-report-generate-btn:hover {
   background: linear-gradient(135deg, #00e5bb 0%, #00b696 100%);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 212, 170, 0.3);
 }
 
 /* Content Styles */
-.summary-content,
-.conclusion-content,
-.recommendation-content {
+.final-report-summary-content,
+.final-report-conclusion-content,
+.final-report-recommendation-content {
   line-height: 1.6;
 }
 
-.summary-line,
-.conclusion-line,
-.recommendation-line {
+.final-report-summary-line,
+.final-report-conclusion-line,
+.final-report-recommendation-line {
   margin-bottom: 12px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 14px;
@@ -384,24 +411,26 @@
   hyphens: none;
 }
 
-.summary-line:last-child,
-.conclusion-line:last-child,
-.recommendation-line:last-child {
+.final-report-summary-line:last-child,
+.final-report-conclusion-line:last-child,
+.final-report-recommendation-line:last-child {
   margin-bottom: 0;
 }
 
 /* Loading State */
-.loading-state {
+.final-report-loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 16px;
   color: var(--text-secondary);
-  min-height: 100px;
+  min-height: 200px;
+  height: 100%;
+  width: 100%;
 }
 
-.loading-spinner {
+.final-report-loading-spinner {
   width: 32px;
   height: 32px;
   border: 3px solid rgba(255, 255, 255, 0.2);
@@ -416,17 +445,13 @@
 }
 
 /* Empty State */
-.empty-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100px;
+.final-report-empty-state {
   color: var(--text-secondary);
   font-style: italic;
 }
 
 /* Footer */
-.footer {
+.final-report-footer {
   grid-area: footer;
   height: 60px;
   background-color: #1D212B;
@@ -434,7 +459,7 @@
   contain: layout;
 }
 
-.footer-content {
+.final-report-footer-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -443,18 +468,18 @@
   min-height: 60px;
 }
 
-.footer-left {
+.final-report-footer-left {
   flex: 1;
   display: flex;
   align-items: center;
 }
 
-.footer-right {
+.final-report-footer-right {
   display: flex;
   align-items: center;
 }
 
-.back-button {
+.final-report-back-button {
   padding: 12px 24px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -469,27 +494,27 @@
   transition: all 0.3s ease;
 }
 
-.back-button:hover {
+.final-report-back-button:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: translateY(-2px);
 }
 
 /* Scrollbar Styling */
-.panel-content::-webkit-scrollbar {
+.final-report-panel-content::-webkit-scrollbar {
   width: 6px;
 }
 
-.panel-content::-webkit-scrollbar-track {
+.final-report-panel-content::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 3px;
 }
 
-.panel-content::-webkit-scrollbar-thumb {
+.final-report-panel-content::-webkit-scrollbar-thumb {
   background: rgba(0, 212, 170, 0.4);
   border-radius: 3px;
 }
 
-.panel-content::-webkit-scrollbar-thumb:hover {
+.final-report-panel-content::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 212, 170, 0.6);
 }
 
@@ -497,28 +522,97 @@
 @media (max-width: 1200px) {
   .final-report-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 16px;
   }
   
-  .report-panel {
-    min-height: 300px;
+  .final-report-panel {
+    min-height: 250px;
+  }
+  
+  .final-report-main-container {
+    padding: 16px;
   }
 }
 
 @media (max-width: 768px) {
-  .patient-info-card {
+  .final-report-page {
+    grid-template-rows: 44px auto 1fr 60px;
+  }
+  
+  .final-report-patient-info-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .final-report-patient-info-card {
     flex-direction: column;
     height: auto;
     padding: 15px;
     gap: 10px;
+    min-width: unset;
+    flex: 1;
   }
   
-  .patient-info-item {
+  .final-report-end-exam-button {
+    width: 100%;
+    height: 50px;
+    padding: 12px 16px;
+  }
+  
+  .final-report-patient-info-item {
     gap: 10px;
+    font-size: 12px;
+  }
+  
+  .final-report-info-value,
+  .final-report-info-value-bold {
+    font-size: 14px;
   }
   
   .final-report-button {
     padding: 12px 16px;
     height: auto;
+    min-width: 80px;
+  }
+  
+  .final-report-button span {
+    font-size: 14px;
+  }
+  
+  .main-container {
+    padding: 12px;
+  }
+  
+  .final-report-grid {
+    gap: 12px;
+  }
+  
+  .report-panel {
+    min-height: 200px;
+  }
+  
+  .panel-header {
+    padding: 16px;
+  }
+  
+  .panel-title {
+    font-size: 16px;
+  }
+  
+  .panel-content {
+    padding: 16px;
+  }
+  
+  .right-controls-container {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+  
+  .patient-info-row {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
   }
 }

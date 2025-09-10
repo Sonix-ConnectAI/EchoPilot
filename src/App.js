@@ -15,12 +15,16 @@ function App() {
 
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
+    setAssessmentData(null); // 새로운 환자 선택 시 기존 assessment 데이터 초기화
+    setAssessedPatient(null); // 새로운 환자 선택 시 기존 assessed patient 데이터 초기화
+    setIsProcessingPatient(false); // 처리 상태 초기화
     setCurrentPage('dataview');
   };
 
   const handleBackToSelection = () => {
     setSelectedPatient(null);
     setAssessedPatient(null);
+    setAssessmentData(null); // selection으로 돌아갈 때 assessment 데이터 초기화
     setIsProcessingPatient(false);
     setCurrentPage('selection');
   };
@@ -69,14 +73,19 @@ function App() {
         return (
           <PatientAssessment 
             patient={selectedPatient} 
+            initialSummary={assessmentData?.summary || ''}
+            initialStructuredData={assessmentData?.structuredData || null}
+            initialKeywords={assessmentData?.keywords || []}
             onBack={handleBackToDataView}
+            onEndExam={handleBackToSelection}
             onProceed={(action, data) => {
               if (action === 'final-report') {
                 // Pass assessment data to final report
                 handleProceedToFinalReport({
                   patient: selectedPatient,
                   summary: data?.summary || '',
-                  structuredData: data?.structuredData || {}
+                  structuredData: data?.structuredData || {},
+                  keywords: data?.keywords || []
                 });
               } else {
                 handleProceedToDetail(action);
@@ -99,7 +108,10 @@ function App() {
             patient={assessmentData?.patient || selectedPatient}
             summary={assessmentData?.summary}
             structuredData={assessmentData?.structuredData}
-            onBack={() => setCurrentPage('assessment')}
+            onBack={() => {
+              console.log('📝 [App] End Exam - Returning to Patient Selection');
+              setCurrentPage('selection');
+            }}
           />
         );
       default:

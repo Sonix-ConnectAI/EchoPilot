@@ -1955,27 +1955,71 @@
 
 /* Measurement Fields */
 .measurement-fields {
-  padding: 5px;
-  margin-bottom: 25px;
+  padding-top: 0px;
   animation: slideInDown 0.5s ease-out;
-  max-height: 100%;
+  height: calc(100% - 52px);
   overflow-y: auto;
   overflow-x: hidden;
   width: 100%;
   box-sizing: border-box;
 }
 
-.measurement-field {
+.measurement-item {
   background: #1D212B;
-  padding: 10px 25px;
+  padding: 4px 10px;
   border-radius: 0px;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
   transition: all 0.3s ease;
+}
+
+.measurement-item:last-child {
+  border-bottom: none;
+}
+
+.measurement-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(249, 168, 37, 0.3);
+  transform: none;
+}
+
+.measurement-row {
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0;
   gap: 15px;
+  width: 100%;
+  min-width: 0;
+}
+
+.measurement-category-cell {
+  flex: 0 0 auto;
+  min-width: 150px;
+}
+
+.measurement-category-text {
+  font-size: 12px;
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.measurement-name {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.measurement-field {
+  flex: 0 0 auto;
 }
 
 .measurement-field:last-child {
@@ -1983,30 +2027,26 @@
   margin-bottom: 0;
 }
 
-.measurement-field label {
-  font-size: 14px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  flex: 0 0 auto;
-  min-width: 120px;
-}
-
-.measurement-field input[type="number"] {
+.measurement-field input[type="text"] {
   width: 150px;
-  padding: 3px 5px;
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 14px;
   transition: all 0.3s ease;
-  flex: 0 0 auto;
 }
 
-.measurement-field input[type="number"]:focus {
+.measurement-field input[type="text"]:focus {
   outline: none;
   border-color: var(--accent-primary);
   background: rgba(255, 255, 255, 0.1);
+}
+
+.measurement-field input[type="text"]::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
 }
 
 /* Scrollbar styling for measurement fields */
@@ -3348,8 +3388,7 @@
   padding-top: 0px;
   animation: slideInDown 0.5s ease-out;
   /* Limit by viewport so inner scroll can appear */
-  max-height: calc(100vh - 220px);
-  min-height: 0; /* allow overflow inside flex parent */
+  height: calc(100% - 52px);
   overflow-y: auto;
   overflow-x: hidden;
   width: 100%;
@@ -3459,7 +3498,7 @@
 
 .feature-category-cell {
   flex: 0 0 auto;
-  min-width: 130px; /* fixed space so name never overlaps */
+  min-width: 150px; /* fixed space so name never overlaps */
 }
 
 .feature-category-label {
@@ -4737,4 +4776,5 @@
   background: #2a2a2a;
   color: #ffffff;
 }
+
 

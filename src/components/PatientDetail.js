@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import '../styles/PatientDetail.css';
-import '../styles/RecommendFeature.css';
 import { generateAIReport } from '../services/openaiService';
 import HoverableText from './HoverableText';
 
