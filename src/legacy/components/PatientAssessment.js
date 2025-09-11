@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from '
 import { createPortal } from 'react-dom';
 import io from 'socket.io-client';
 import '../styles/PatientAssessment.css';
-import { generateSummary, structurePatientData, extractKeywordsFromSummary, updateStructuredDataFromSummary, generateSummaryFromStructuredData } from '../services/openaiService';
+import { structurePatientData, extractKeywordsFromSummary, updateStructuredDataFromSummary, generateSummaryFromStructuredData } from '../services/openaiService';
 import { npzToVideoUrl, cleanupVideoUrl } from '../utils/videoProcessor';
 import { getExamEntryById} from '../utils/dbUtils';
 import BottomSheet from './BottomSheet';
@@ -563,7 +563,7 @@ const standardizedStructure_measure = {
 };
 
 // DetailEditor Component for editing patient data - Memoized for performance
-const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, onClose, selectedBlockType, videoSegments, summaryKeywords, highlightedFeature, selectedKeyword, resolveKeyword, mapFeatureToField, onApplyWithSummary, onHandlersReady }) => {
+const DetailEditor = memo(({ structuredData, patientData, baselinePatientData, summaryKeywords, selectedKeyword, resolveKeyword, onApplyWithSummary, onHandlersReady }) => {
   const [editedStructuredData, setEditedStructuredData] = useState(structuredData || {});
   const [originalStructuredData, setOriginalStructuredData] = useState(structuredData || {});
   const [hasChanges, setHasChanges] = useState(false);
@@ -1483,24 +1483,20 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
   const [error, setError] = useState(null);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [structuredData, setStructuredData] = useState(initialStructuredData);
-  const [selectedBlockType, setSelectedBlockType] = useState(null);
+  
   const [summaryKeywords, setSummaryKeywords] = useState(initialKeywords);
   const baselineKeywordsRef = useRef(null);
   const [isExtractingKeywords, setIsExtractingKeywords] = useState(false);
   const [keywordErr, setKeywordErr] = useState(null);
-  const [tooltipData, setTooltipData] = useState(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  
   const [examEntry, setExamEntry] = useState(null);
   const [editorHandlers, setEditorHandlers] = useState(null);
-  const tooltipRef = useRef(null);
-  const [relatedVideos, setRelatedVideos] = useState([]);
-  const [keywordVideos, setKeywordVideos] = useState([]);
-  const [showingVideos, setShowingVideos] = useState(false);
+  
   const [selectedVideoCategory, setSelectedVideoCategory] = useState('all');
-  const [availableCategories, setAvailableCategories] = useState([]);
+  
   const [allVideosData, setAllVideosData] = useState([]);
   const [expandedVideo, setExpandedVideo] = useState(null);
-  const [highlightedFeature, setHighlightedFeature] = useState(null);
+  
   const [isSummaryEditMode, setIsSummaryEditMode] = useState(false);
   const [editedSummary, setEditedSummary] = useState('');
   const [selectedKeyword, setSelectedKeyword] = useState(null);
@@ -1521,7 +1517,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
   
   // Chat and Canvas states
   const [messages, setMessages] = useState([]);
-  const [canvasContent, setCanvasContent] = useState('');
+  
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -1530,14 +1526,13 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
 
   
   // Connection and Analysis Status States
-  const [connectionStatus, setConnectionStatus] = useState(''); // 'Connecting', 'Connected', 'Connection failed', 'Disconnected'
-  const [analysisStatus, setAnalysisStatus] = useState(''); // 'Analyzing AI data', 'Analysis failed'
+  
   const [streamingSummary, setStreamingSummary] = useState(''); // For real-time streaming display
   
   // Loading states for different phases
   const [isInitializing, setIsInitializing] = useState(true);
   const [loadingPhase, setLoadingPhase] = useState(0);
-  const [loadingMessage, setLoadingMessage] = useState('');
+  
   
   // Dropdown open states
   const [isImageQualityOpen, setIsImageQualityOpen] = useState(false);
@@ -1768,21 +1763,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
 
   
   // Cache for regex patterns to avoid recompilation
-  const regexCacheRef = useRef(new Map());
   
-  // Shared normalization function for consistent string matching
-  const normalize = useCallback((str) => {
-    if (!str) return '';
-    return str
-      .normalize('NFKC')
-      .replace(/\u00A0/g, ' ') // NBSP -> space
-      .replace(/[\u2010-\u2015]/g, '-') // various hyphens -> '-'
-      .replace(/[""„‟]/g, '"') // fancy double quotes -> "
-      .replace(/[''‚‛]/g, "'") // fancy single quotes -> '
-      .replace(/\s+/g, ' ') // collapse whitespace
-      .trim()
-      .toLowerCase();
-  }, []);
   
   // Helper function to resolve keyword by sentence + normalized text
   const resolveKeyword = useCallback((sentenceNumber, normalizedKeyword) => {
@@ -1828,30 +1809,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
     return result;
   }, [summaryKeywords]);
   
-  // Helper function to map key_feature values to field names
-  const mapFeatureToField = useCallback((feature) => {
-    // Check if it's already a direct field name
-    if (standardizedStructure[feature]) {
-      return { category: feature, field: feature };
-    }
-    
-    // Search nested structures
-    for (const [category, fields] of Object.entries(standardizedStructure)) {
-      if (typeof fields === 'object' && !Array.isArray(fields)) {
-        // Check if feature is a field name
-        if (fields[feature]) {
-          return { category, field: feature };
-        }
-        // Check if feature is a field value
-        for (const [fieldName, fieldValues] of Object.entries(fields)) {
-          if (Array.isArray(fieldValues) && fieldValues.includes(feature)) {
-            return { category, field: fieldName, value: feature };
-          }
-        }
-      }
-    }
-    return null;
-  }, []);
+  
   
   // Memoize merged keywords to avoid recreation on every render
   const mergedKeywords = useMemo(() => {
@@ -2138,7 +2096,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
     
     setIsGeneratingSummary(true);
     setError(null);
-    setAnalysisStatus('Analyzing AI data');
+    
     setStreamingSummary(''); // Clear streaming summary
     
     try {
@@ -2167,7 +2125,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
     } catch (err) {
       console.error('❌ Failed to start summary generation:', err);
       setError('Failed to start AI summary generation. Please try again.');
-      setAnalysisStatus('Analysis failed');
+      
       setIsGeneratingSummary(false);
     }
   };
@@ -2194,7 +2152,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
       updateLoadingPhase(5, 'Assessment ready!');
       setTimeout(() => {
         setIsInitializing(false);
-      }, 10000);
+      }, 5000);
       // Ensure parent holds latest snapshot as well
       if (typeof onAssessmentDataChange === 'function') {
         onAssessmentDataChange({
@@ -2293,14 +2251,14 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
           updateLoadingPhase(5, 'Assessment ready!');
           setTimeout(() => {
             setIsInitializing(false);
-          }, 10000);
+          }, 5000);
         }
       } else if (summaryKeywords.length > 0) {
         // Update loading phase to complete
         updateLoadingPhase(5, 'Assessment ready!');
         setTimeout(() => {
           setIsInitializing(false);
-        }, 10000);
+        }, 5000);
       }
     } catch (err) {
       setError('Failed to generate AI summary. Please try again.');
@@ -2462,7 +2420,6 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
         isTransitioningRef.current = true;
         const structured = structurePatientData(patientData);
         setStructuredData(structured);
-        setSelectedBlockType(null);
         
         // Use a small delay to ensure selectedKeyword state has updated
         setTimeout(() => {
@@ -2489,18 +2446,9 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
         // Highlight all features for this keyword
         const features = keywordObj.key_feature;
         if (features.length > 0) {
-          // Highlight the first feature for scrolling
+          // 첫 feature 위치로 스크롤만 수행
           const firstFeature = features[0];
-
-          setHighlightedFeature(firstFeature);
-          
-          // Use debounced scroll for feature
           scrollToElementDebounced(`#feature-${firstFeature}`, { block: 'center' });
-          
-          // Remove highlight after delay
-          setTimeout(() => {
-            setHighlightedFeature(null);
-          }, 3000);
         }
       } else {
         // If no features, try to get video category from new structure or fall back to old structure
@@ -2536,7 +2484,6 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
         isTransitioningRef.current = true;
         const structured = structurePatientData(patientData);
         setStructuredData(structured);
-        setSelectedBlockType(null);
         
         // Use a small delay to ensure selectedKeyword state has updated
         setTimeout(() => {
@@ -2742,13 +2689,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
   }, [socket, patientData, summary, structuredData]);
 
   // Debug AI Canvas visibility
-  const debugCanvasVisibility = useCallback(() => {
-  }, [isChatActive, showDetailPanel]);
-
-  // Debug on state changes
-  useEffect(() => {
-    debugCanvasVisibility();
-  }, [isChatActive, showDetailPanel, debugCanvasVisibility]);
+  
 
   // Initialize WebSocket connection and start summary generation on patient selection
   useEffect(() => {
@@ -2762,7 +2703,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
       reconnection: true,
       reconnectionAttempts: 10, // Increase attempts
       reconnectionDelay: 500, // Faster reconnection
-      timeout: 10000, // Faster timeout
+      timeout: 5000, // Faster timeout
       forceNew: true, // Force new connection
       autoConnect: true
     });
@@ -2872,9 +2813,8 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
       console.log('✅ Stream completed:', data);
       setIsTyping(false);
       
-      // Clear analysis status on completion
+      // Clear loading on completion
       if (data.type === 'summary') {
-        setAnalysisStatus('');
         setIsGeneratingSummary(false);
         
         // Finalize the summary (NOT adding to chat messages)
@@ -2910,7 +2850,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
               updateLoadingPhase(5, 'Assessment ready!');
               setTimeout(() => {
                 setIsInitializing(false);
-              }, 10000);
+              }, 5000);
             }
           })();
         } else if (summaryKeywords.length > 0) {
@@ -2919,7 +2859,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
           updateLoadingPhase(5, 'Assessment ready!');
           setTimeout(() => {
             setIsInitializing(false);
-          }, 10000);
+          }, 5000);
         }
       }
       
@@ -2962,7 +2902,6 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
       
       // Update status based on error type
       if (data.type === 'summary') {
-        setAnalysisStatus('Analysis failed');
         setIsGeneratingSummary(false);
         setError(`Summary generation failed: ${data.message}`);
       }
@@ -3232,9 +3171,8 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
       return cat;
     });
     
-    // Remove duplicates and set available categories
+    // Remove duplicates
     const uniqueCategories = [...new Set(processedCategories)];
-    setAvailableCategories(uniqueCategories);
     
     // Get top 10 videos overall and top 10 keyword-relevant videos
     const generalVideos = uniqueVideos.slice(0, 10);
@@ -3559,9 +3497,8 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
   };
 
   // Loading phase management
-  const updateLoadingPhase = useCallback((phase, message) => {
+  const updateLoadingPhase = useCallback((phase, _message) => {
     setLoadingPhase(phase);
-    setLoadingMessage(message);
   }, []);
 
   // Load video segments and generate summary on mount
@@ -3633,7 +3570,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
         
         // Phase 3: Generating AI summary (최소 2초 표시)
         updateLoadingPhase(3, 'Generating AI summary...');
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // 이제 실제 summary 생성을 시작하되, loading은 유지
         handleGenerateSummary();
@@ -3684,18 +3621,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
   
   // Regenerate videos when examEntry becomes available
   useEffect(() => {
-    if (examEntry && summaryKeywords.length > 0 && relatedVideos.length === 0 && !hasGeneratedVideosRef.current) {
-      hasGeneratedVideosRef.current = true;
-      generateCategoryBasedVideos(summaryKeywords, examEntry).then(videos => {
-        setRelatedVideos(videos.general);
-        setKeywordVideos(videos.keyword);
-      }).catch(err => {
-        console.error('❌ Failed to regenerate videos:', err);
-        hasGeneratedVideosRef.current = false; // Reset on error
-      });
-    }
-    
-    // Also generate videos for left panel if not using keywords
+    // Also generate videos for left panel based on attention data
     if (examEntry && examEntry.view_attention && allVideosData.length === 0 && !hasGeneratedLeftPanelVideosRef.current) {
       hasGeneratedLeftPanelVideosRef.current = true;
       generateCategoryBasedVideos([], examEntry).catch(err => {
@@ -4352,7 +4278,7 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
           {/* Video Grid Section */}
           <div className="edit-video-section">
             <div className="edit-video-grid">
-              {(keywordFilteredVideos.length > 0 ? keywordFilteredVideos : videoSegments.slice(0, 5)).map((video, index) => (
+              {(keywordFilteredVideos.length > 0 ? keywordFilteredVideos : getFilteredVideos().slice(0, 5)).map((video, index) => (
                 <div key={index} className={`edit-video-item ${keywordFilteredVideos.length > 0 ? 'keyword-selected' : ''}`}>
                   {video.url ? (
                     <video
@@ -4387,14 +4313,9 @@ const PatientAssessment = memo(({ patient, initialSummary = '', initialStructure
                   patientData={patientData}
                   baselinePatientData={originalPatientData?.patientData || patient}
                   onApplyWithSummary={updatePatientDataFromDetailWithSummary}
-                  onClose={closeDetailPanel}
-                  selectedBlockType={selectedBlockType}
-                  videoSegments={videoSegments}
                   summaryKeywords={summaryKeywords}
-                  highlightedFeature={highlightedFeature}
                   selectedKeyword={selectedKeyword}
                   resolveKeyword={resolveKeyword}
-                  mapFeatureToField={mapFeatureToField}
                   onHandlersReady={setEditorHandlers}
                 />
               )}
